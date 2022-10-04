@@ -2,7 +2,6 @@ import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots()
 
-#i = []
 ke = []
 gpe = []
 te = []
@@ -18,7 +17,6 @@ with open("Energy.txt") as f:
             step.append(step[-1] + float(d[3]))
         else:
             step.append(float(d[3]))
-
 
 ax.plot(step, ke, label="KE")
 ax.plot(step, gpe, label="GPE")
