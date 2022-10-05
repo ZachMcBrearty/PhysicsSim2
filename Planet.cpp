@@ -1,18 +1,22 @@
-#include "Vector.cpp"
-
 #include<iostream>
+
+#include "Vector.cpp"
 
 class Planet {
     public:
+        Planet();
         Planet(int id, double mass_, double radius_, Vector pos_);
         Planet(Planet parent, int id, double mass_,
             double rad_, double aphelion, double semimajor, double progression);
         void update();
         void print();
+        void setLocal(double localtimestep);
         int id;
-        double mass, radius;
+        double mass, radius, timestep = maxtimestep;
         Vector pos, vel, acc;
 };
+Planet::Planet(){
+}
 Planet::Planet(int id, double mass_, double radius_, Vector pos_) {
     this->id = id;
     this->mass = mass_;
@@ -37,10 +41,15 @@ Planet::Planet(Planet parent, int id, double mass_,
     this->acc = Vector(0,0,0);
 }
 void Planet::update(){
-    this->pos += this->vel * timestep;
-    this->vel += this->acc * timestep;
+    this->pos += this->vel * this->timestep;
+    this->vel += this->acc * this->timestep;
     this->acc = Vector(0,0,0);
 }
 void Planet::print() {
     std::cout << "Planet, " << id << std::endl;
+}
+void Planet::setLocal(double localtimestep){
+    if (localtimestep < this->timestep) {
+        this->timestep = localtimestep;
+    }
 }
