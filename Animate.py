@@ -11,7 +11,7 @@ ydata = []
 ln, = ax.plot([], [], 'ro')
 timetext = ax.text(0.05, 0.9,"", transform=ax.transAxes)
 trace = []
-tracelength = 5000
+tracelength = 10
 scale = 2*10**11 # m
 
 def getData(filename):
@@ -23,7 +23,7 @@ def getData(filename):
     objs = [] # 3D
     with open(filename, "r") as f:
         for line in f:
-            time, energies, positions = line.split(" # ")
+            time, energies, positions = line.strip().split(" # ")
             times.append(float(time))
 
             energies = list(map(float, energies.split(" , ")))
@@ -32,7 +32,7 @@ def getData(filename):
             total.append(energies[2])#
 
             pos = positions.split(" * ")
-            pos = [list(map(float, q[1:-2].split(", "))) for q in pos]
+            pos = [list(map(float, q[1:-1].split(", "))) for q in pos]
             objs.append(pos)
     return times, kinetic, gravitational, total, objs
 
@@ -96,7 +96,7 @@ def graphEnergies(filename, change=False):
 
 
 if __name__=="__main__":
-    f = "PlanetsPositionsEnergy57-18-04-10-22.txt"
-    animateFile(f, framesskip=50, repeat=False, scale_=500 * 10**16 * 1.3)
+    f = "PlanetsSim.txt"
+    animateFile(f, framesskip=1, repeat=False, scale_=5)
     graphEnergies(f)
     graphEnergies(f, True)
