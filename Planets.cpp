@@ -37,7 +37,7 @@ void interact(){
                 F = findForce(d, *iter1, *iter2);
                 iter1->acc -= F / iter1->mass;
                 iter2->acc += F / iter2->mass;
-                localtimestep = scale / d.abs() * maxtime;
+                localtimestep = d.abs() / scale * maxtime;
                 iter1->setLocal(localtimestep);
                 iter2->setLocal(localtimestep);
                 iter2++;

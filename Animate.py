@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import Animation, FuncAnimation
 
+from Constants import tracelength, scale
+
 fig, ax = plt.subplots()
 xs = []
 ys = []
@@ -11,8 +13,6 @@ ydata = []
 ln, = ax.plot([], [], 'ro')
 timetext = ax.text(0.05, 0.9,"", transform=ax.transAxes)
 trace = []
-tracelength = 10
-scale = 2*10**11 # m
 
 def getData(filename):
     times = [] # 1D
@@ -59,7 +59,6 @@ def animate(i):
             t.set_data(xs[:i, j], ys[:i, j])
     #timetext.set_text(str(times[i])+"s")
     timetext.set_text(str(times[i] / (1000 * 365.25 * 24 * 60 * 60))+"k.yr")
-    100 * 365.25 * 24 * 60 * 60
     return ln, *trace, timetext
 
 def animateFile(filename, framesskip=1, repeat=True, scale_=2*10**11):
