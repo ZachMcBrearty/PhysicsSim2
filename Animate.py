@@ -1,8 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import Animation, FuncAnimation
-
-#from Constants import tracelength, scale
+from matplotlib.animation import FuncAnimation
 
 fig, ax = plt.subplots()
 fig.set_figheight(5)
@@ -12,7 +10,7 @@ ys = []
 times = []
 xdata = []
 ydata = []
-ln, = ax.plot([], [], 'ro')
+ln, = ax.plot([], [], 'o')
 timetext = ax.text(0.05, 0.9,"", transform=ax.transAxes)
 trace = []
 scale = (1, "m")
@@ -51,19 +49,10 @@ def getDataBinary(filename, p):
         kinetic = data[1::n]
         gravi = data[2::n]
         total = kinetic + gravi
-        data = np.delete(data, np.s_[0::n])# data[0::n]
+        data = np.delete(data, np.s_[0::n])
         data = np.delete(data, np.s_[0::n-1])
         data = np.delete(data, np.s_[0::n-2])
         objs = np.reshape(data, (-1, p, 3))
-        # xs = data[0::n-3]
-        # ys = data[1::n-3]
-        # zs = data[2::n-3]
-        # for q in range(p):
-        #     pxs = xs[q  ::3*p]
-        #     pys = ys[q+1::3*p]
-        #     pzs = zs[q+2::3*p]
-        #     obj = np.array([pxs, pys, pzs]).T
-        #     objs.append(obj)
     return times, kinetic, gravi, total, objs
 
 def init():

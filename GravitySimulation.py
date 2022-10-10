@@ -1,3 +1,4 @@
+from glob import glob
 from itertools import combinations
 import numpy as np
 from io import TextIOWrapper as _TextIOWrapper
@@ -5,9 +6,6 @@ from random import random
 
 from Animate import animateFile, graphEnergies
 
-#G = 1
-
-c = 3 * 10**8 # m.s^-1
 G = 6.67 * 10**-11 # m^3.s^-2.kg^-1 = c^2.s.kg^-1
 M = 1.988 * 10**30 # kg
 m = 5.97 * 10**24 # kg
@@ -21,16 +19,18 @@ timestepB = 100
 
 logscale = 1 / np.log(scale/timestepB + 1)
 
-eps = 0.1
+# dampening of the system
+eps = 0.1 * scale
 
+# Default file to use if none is specified
 DEFAULTFILE = "GravitySim.bin"
 
 class System:
-    def __init__(self, MaxTimeStep=100, file=None):
+    def __init__(self, MaxTimeStep:float=100, file=None):
         '''Gravity Simulation system, add particles using .AddParticle,
         MaxTimeStep is the largest step in time taken in the simulation, variable based on distance
-        file is the name or fileobject of the binary datafile to be used,
-        if none used the "DEFAULTFILE" value'''
+        file is the name or open fileobject of the binary datafile to be used,
+        if none the "DEFAULTFILE" value is used'''
         self.time = 0
         self.MaxTimeStep = MaxTimeStep
         self.CurTimeStep = MaxTimeStep
@@ -43,6 +43,7 @@ class System:
         elif isinstance(file, _TextIOWrapper):
             self.File = file
         self.minDist = scale
+        self.rec = np.array([])
 
     def Interaction(self) -> None:
         """Pair up each particle in self.Particles, find the distance between them
@@ -59,20 +60,22 @@ class System:
             F = (G / (dabs**2 + eps**2)**(3/2)) * d # bracket so one number is multiplied onto the array
             A[2] -= F * self.ParticleMasses[j] # masses multiplied here to avoid
             B[2] += F * self.ParticleMasses[i] # multiplying then dividing
+        # + 0.001 to avoid having timestep go completely to 0 (ie when 2 particles are overlapping)
+        # important in the 1D case
         self.CurTimeStep = self.MaxTimeStep * (np.log(self.minDist/timestepB + 1) * logscale + .001)
 
     def Update(self) -> None:
         """Update the positions and velocities of the particles in the system based
         on the current time step"""  
         updateMatrix = np.array([[1, self.CurTimeStep, 0],[0, 1, self.CurTimeStep],[0, 0, 0]])
+        # adds velocity to position, acceleration to velocity and then sets acceleration to 0
         self.Particles = updateMatrix @ self.Particles
+        # reset the minimum distance
         self.minDist = scale
         self.time += self.CurTimeStep
-        # for particle in self.Particles:
-        #     particle = updateMatrix @ particle
 
     def doTimestep(self, tmin:float = None) -> None:
-        """Call self.Interaction then self.Update, variable timestep length"""#
+        """Call self.Interaction then self.Update, variable timestep length"""
         if tmin is None:
             self.Interaction()
             self.Update()
@@ -81,14 +84,15 @@ class System:
             while t < tmin:
                 self.Interaction()
                 if t + self.CurTimeStep > tmin:
+                    # dont overshoot the desired timestep
                     self.CurTimeStep = tmin - t
                 self.Update()
                 t += self.CurTimeStep
 
     def AddParticle(self, m:float, x:float, y:float, z:float, vx=0.0, vy=0.0, vz=0.0):
-        """Add a particle with mass m at coordinates (x, y, z) with optional velocity (vx, vy, vz)"""
-        # idk which one works
-        # self.Particles.append(np.array([[x,y,z], [vx,vy,vz],[0,0,0]]))
+        """Add a particle with mass m at coordinates (x, y, z) 
+        with optional velocity (vx, vy, vz)"""
+        # these 2 arrays should always be the same length
         if self.ParticleMasses is None:
             self.ParticleMasses = np.array([m])
         else:
@@ -109,6 +113,7 @@ class System:
 
     def kineticEnergy(self):
         """Find and sum all the kinetic energies of the particles in the system"""
+        # another matrix multiplication to save time
         return 0.5 * np.sum(self.ParticleMasses.T @ self.Particles[:,1]**2)
 
     def gravitationalEnergy(self):
@@ -121,51 +126,70 @@ class System:
             B = self.Particles[j]
             d = A[0] - B[0]
             dabs = np.sqrt(np.sum(d**2))
+            # Eps included here due to change in force changing energy
             Et -= (G * self.ParticleMasses[i] * self.ParticleMasses[j] / (dabs**2 + eps**2)**(1/2))
         return Et
 
     def Record(self):
         """Record the state of the system to self.File
         state -> time, energy, position"""
+        np.array(self.rec).tofile(self.File)
+        self.rec = np.array([])
+
+    def append(self):
         kin = self.kineticEnergy()
         grav = self.gravitationalEnergy()
-        a = [self.time, kin, grav] + list(self.Particles[:, 0].flatten())
-        np.array(a).tofile(self.File)
-
-    def print(self):
-        print(self.ParticleMasses)
-        print(self.Particles)
+        self.rec = np.append(self.rec, [self.time, kin, grav] + list(self.Particles[:, 0].flatten()))
 
 def solarExample():
-    a = System(0.1 * 60 * 60, file="Solar.bin") # 0.1 hour, in s
+    a = System(0.1 * 60 * 60, file="Solar.bin") # 0.1 hour = 6 min = 360s
     vplan = (G * M * (2/aph - 1/sem))**0.5
     # motion of the sun is to effectively conserve momentum so 
     # the system stays fixed at (0,0)
     a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m / M * vplan, 0.0) # Sun
     a.AddParticle(m, aph, 0.0, 0.0, 0.0, vplan, 0.0)
     # #print(a.Particles[:,:,0])
-    for _ in range(366):
-        a.Record()
-        a.doTimestep(24*60*60)
-    # framesskip = 20 days
-    animateFile("Solar.bin", framesskip=1, repeat=False,
+    for q in range(365*4 + 1):
+        # record first to get t=0
+        a.append()
+        if q % 10 == 0:
+            a.Record()
+        # 1/4 of a day to include the .25 in 365.25 days in a year
+        a.doTimestep(6*60*60)
+    # Record after to get the final timestep
+    a.append()
+    a.Record()
+    # framesskip = 1 day
+    animateFile("Solar.bin", framesskip=4, repeat=False,
             scale_=(solarscale, "A.U."), p=2, timescale_=(365.25*24*60*60, "years"))
-    graphEnergies("Solar.bin")
-    graphEnergies("Solar.bin", True)
+    graphEnergies("Solar.bin", change=False, p=2)
+    graphEnergies("Solar.bin", change=True,  p=2)
+    a.File.close()
+
+def globRand():
+    return 2*(random()-0.5)
+
+def globularExample():
+    # globular cluster
+    p=20
+    a = System(10, file="Glob.bin")
+   
+    for _ in range(p):
+        a.AddParticle(100, globRand(), globRand(), globRand())
+
+    for t in range(10000):
+        a.append()
+        if t % 100 == 0:
+            print(100*t/10000,"%")
+            a.Record()
+        a.doTimestep(10)
+
+    animateFile("Glob.bin", framesskip=10, repeat=False,
+            scale_=(globscale, "m"), p=p, timescale_=(1, "s"))
+    graphEnergies("Glob.bin", p=p)
+    graphEnergies("Glob.bin", True, p=p)
     a.File.close()
 
 if __name__=="__main__":
-    # globular cluster
-    # a = System(1, file="Glob.bin")
-
-    # for _ in range(10):
-    #     a.AddParticle(100, random()-0.5, random()-0.5, random()-0.5)
-    # for t in range(1000):
-    #     print(100*t/1000,"%")
-    #     a.Record()
-    #     a.doTimestep(10)
-
-    animateFile("Glob.bin", framesskip=10, repeat=False,
-            scale_=(globscale, "m"), p=10, timescale_=(1, "s"))
-    graphEnergies("Glob.bin", p=10)
-    graphEnergies("Glob.bin", True, p=10)
+    # solarExample()
+    globularExample()
