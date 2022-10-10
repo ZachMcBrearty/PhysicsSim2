@@ -2,9 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import Animation, FuncAnimation
 
-from Constants import tracelength, scale
+#from Constants import tracelength, scale
 
 fig, ax = plt.subplots()
+fig.set_figheight(5)
+fig.set_figwidth(5)
 xs = []
 ys = []
 times = []
@@ -13,6 +15,9 @@ ydata = []
 ln, = ax.plot([], [], 'ro')
 timetext = ax.text(0.05, 0.9,"", transform=ax.transAxes)
 trace = []
+scale = (1, "m")
+timescale = (1, "s")
+tracelength = 500
 
 def getData(filename):
     times = [] # 1D
@@ -36,12 +41,37 @@ def getData(filename):
             objs.append(pos)
     return times, kinetic, gravitational, total, objs
 
+def getDataBinary(filename, p):
+    '''p: expected number of particles'''
+    n = 3 + 3 * p
+    objs = []
+    with open(filename, "rb") as f:
+        data = np.fromfile(f)
+        times = data[0::n]
+        kinetic = data[1::n]
+        gravi = data[2::n]
+        total = kinetic + gravi
+        data = np.delete(data, np.s_[0::n])# data[0::n]
+        data = np.delete(data, np.s_[0::n-1])
+        data = np.delete(data, np.s_[0::n-2])
+        objs = np.reshape(data, (-1, p, 3))
+        # xs = data[0::n-3]
+        # ys = data[1::n-3]
+        # zs = data[2::n-3]
+        # for q in range(p):
+        #     pxs = xs[q  ::3*p]
+        #     pys = ys[q+1::3*p]
+        #     pzs = zs[q+2::3*p]
+        #     obj = np.array([pxs, pys, pzs]).T
+        #     objs.append(obj)
+    return times, kinetic, gravi, total, objs
+
 def init():
     global trace
-    ax.set_xlim(-scale, scale)
-    ax.set_xlabel("x, m")
-    ax.set_ylim(-scale, scale)
-    ax.set_ylabel("y, m")
+    ax.set_xlim(-1.2, 1.2)
+    ax.set_xlabel("x, " + scale[1])
+    ax.set_ylim(-1.2, 1.2)
+    ax.set_ylabel("y, " + scale[1])
     trace = [ax.plot([], [],'-', lw=1)[0] for _ in range(tracenum)]
     return ln, *trace, timetext,
 
@@ -58,44 +88,58 @@ def animate(i):
         for j, t in enumerate(trace):
             t.set_data(xs[:i, j], ys[:i, j])
     #timetext.set_text(str(times[i])+"s")
-    timetext.set_text(str(times[i] / (1000 * 365.25 * 24 * 60 * 60))+"k.yr")
+    timetext.set_text(str(round(times[i], 2))+ " " +timescale[1])
     return ln, *trace, timetext
 
-def animateFile(filename, framesskip=1, repeat=True, scale_=2*10**11):
-    global xs, ys, times, tracenum, scale
+def animateFile(filename, framesskip=1, repeat=True, scale_=(1, "m"), 
+    p=2, timescale_=(1, "s")):
+    global xs, ys, times, tracenum, scale, timescale
+    timescale = timescale_
     scale = scale_
-    times, kin, grav, total, objs = getData(filename)
+    if filename.endswith(".txt"):
+        times, kin, grav, total, objs = getData(filename)
+    elif filename.endswith(".bin"):
+        times, kin, grav, total, objs = getDataBinary(filename, p)
     tracenum = len(objs[0])
     pos = np.array(objs)
     
-    xs = pos[:, :, 0]
-    ys = pos[:, :, 1]    
+    times = times / timescale[0]
+    xs = pos[:, :, 0] / scale[0]
+    ys = pos[:, :, 1] / scale[0]
 
     ani = FuncAnimation(fig, animate, frames=range(0, len(pos), framesskip),
                         init_func=init, blit=True, repeat=repeat)
     
     plt.show()
 
-def graphEnergies(filename, change=False):
+def graphEnergies(filename, change=False, p=2):
     fig, ax = plt.subplots()
-    times, kin, grav, total, _ = getData(filename)
+    if filename.endswith(".txt"):
+        times, kin, grav, total, objs = getData(filename)
+    elif filename.endswith(".bin"):
+        times, kin, grav, total, objs = getDataBinary(filename, p)
+    t = times / timescale[0]
     if not change:
-        ax.plot(times, kin, label="KE")
-        ax.plot(times, grav, label="GPE")
-        ax.plot(times, total, label="Total Energy")
+        ax.plot(t, kin, label="KE")
+        ax.plot(t, grav, label="GPE")
+        ax.plot(t, total, label="Total Energy")
+        ax.set_ylabel("Energy, J")
+        ax.set_xlabel("Time, " + timescale[1])
     else:
         te = np.array(total)
         initenergy = te[0]
         change = te - initenergy
-        percchange = change / initenergy
-
-        ax.plot(times, percchange, label="PercentChange in Total")
+        percchange = 100 * change / initenergy
+        ax.plot(t, percchange, label="PercentChange in Total")
+        ax.set_ylabel("Percent change in Energy, %")
+        ax.set_xlabel("Time, "+timescale[1])
     plt.legend()
     plt.show()
 
 
 if __name__=="__main__":
     f = "PlanetsSim.txt"
-    animateFile(f, framesskip=1, repeat=False, scale_=5)
-    graphEnergies(f)
-    graphEnergies(f, True)
+    fbin = "GravitySim.bin"
+    animateFile(fbin, framesskip=1, repeat=False, scale_=10, p=2)
+    #graphEnergies(f)
+    #graphEnergies(f, True)

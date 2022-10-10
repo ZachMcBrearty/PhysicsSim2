@@ -1,11 +1,25 @@
 from itertools import combinations
-from more_itertools import flatten
 import numpy as np
 from io import TextIOWrapper as _TextIOWrapper
+from random import random
 
-G = 1
-scale = 100
+from Animate import animateFile, graphEnergies
+
+#G = 1
+
+c = 3 * 10**8 # m.s^-1
+G = 6.67 * 10**-11 # m^3.s^-2.kg^-1 = c^2.s.kg^-1
+M = 1.988 * 10**30 # kg
+m = 5.97 * 10**24 # kg
+aph = 1.5210 * 10**11 # m
+sem = 1.4960 * 10**11 # m
+
+solarscale = aph
+globscale = 1
+scale = globscale
 timestepB = 100
+
+logscale = 1 / np.log(scale/timestepB + 1)
 
 eps = 0.1
 
@@ -45,15 +59,15 @@ class System:
             F = (G / (dabs**2 + eps**2)**(3/2)) * d # bracket so one number is multiplied onto the array
             A[2] -= F * self.ParticleMasses[j] # masses multiplied here to avoid
             B[2] += F * self.ParticleMasses[i] # multiplying then dividing
-        
-    
+        self.CurTimeStep = self.MaxTimeStep * (np.log(self.minDist/timestepB + 1) * logscale + .001)
+
     def Update(self) -> None:
         """Update the positions and velocities of the particles in the system based
-        on the current time step"""
-        self.CurTimeStep = self.MaxTimeStep * (np.log(self.minDist/timestepB + 1) / np.log(scale/timestepB + 1) + .001) 
+        on the current time step"""  
         updateMatrix = np.array([[1, self.CurTimeStep, 0],[0, 1, self.CurTimeStep],[0, 0, 0]])
         self.Particles = updateMatrix @ self.Particles
         self.minDist = scale
+        self.time += self.CurTimeStep
         # for particle in self.Particles:
         #     particle = updateMatrix @ particle
 
@@ -66,6 +80,8 @@ class System:
             t = 0
             while t < tmin:
                 self.Interaction()
+                if t + self.CurTimeStep > tmin:
+                    self.CurTimeStep = tmin - t
                 self.Update()
                 t += self.CurTimeStep
 
@@ -120,37 +136,36 @@ class System:
         print(self.ParticleMasses)
         print(self.Particles)
 
-if __name__=="__main__":
-    # ener = []
-    # a = System(0.01)
-    # a.AddParticle(2.0, 2.0, 0.0, 0.0, 0.0, 0.0, 0.0)
-    # a.AddParticle(2.0, -2.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+def solarExample():
+    a = System(0.1 * 60 * 60, file="Solar.bin") # 0.1 hour, in s
+    vplan = (G * M * (2/aph - 1/sem))**0.5
+    # motion of the sun is to effectively conserve momentum so 
+    # the system stays fixed at (0,0)
+    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m / M * vplan, 0.0) # Sun
+    a.AddParticle(m, aph, 0.0, 0.0, 0.0, vplan, 0.0)
     # #print(a.Particles[:,:,0])
-    # for _ in range(1000):
-    #     a.doTimestep(2)
+    for _ in range(366):
+        a.Record()
+        a.doTimestep(24*60*60)
+    # framesskip = 20 days
+    animateFile("Solar.bin", framesskip=1, repeat=False,
+            scale_=(solarscale, "A.U."), p=2, timescale_=(365.25*24*60*60, "years"))
+    graphEnergies("Solar.bin")
+    graphEnergies("Solar.bin", True)
+    a.File.close()
+
+if __name__=="__main__":
+    # globular cluster
+    # a = System(1, file="Glob.bin")
+
+    # for _ in range(10):
+    #     a.AddParticle(100, random()-0.5, random()-0.5, random()-0.5)
+    # for t in range(1000):
+    #     print(100*t/1000,"%")
     #     a.Record()
-    #     #print(a.Particles[:,:,0])
-    #     k, g = a.kineticEnergy(), a.gravitationalEnergy()
-    #     ener.append(k+g)
-    # ener = np.array(ener)
-    # print(list(100*abs(1 - ener / ener[0])))
-    # a.File.close()
-    
-    # Example Reading of the data file
-    binfile = open(DEFAULTFILE, "rb")
-    b = np.fromfile(binfile)
-    n = 3 + 3 * 2 # 3 -> time, kinetic, gravity, 3 -> 3d, 2 = number of particles
-    #print("TIME : ", b[0::n])
-    #print("KINET: ", b[1::n])
-    #print("GRAVI: ", b[2::n])
-    #print("TOTAL: ", b[1::n]+b[2::n])
-    t0 = (b[1::n]+b[2::n])[0]
-    te = (b[1::n]+b[2::n])[-1]
-    print(100*abs(1-te/t0))
-    print(np.average(b[3::n]))
-    print(np.std(b[3::n]))
-    print(np.average(b[6::n]))
-    print(np.std(b[6::n]))
-    #print("PART1: ", b[3::n], b[4::n], b[5::n])
-    #print("PART2: ", b[6::n], b[7::n], b[8::n])
-    binfile.close()
+    #     a.doTimestep(10)
+
+    animateFile("Glob.bin", framesskip=10, repeat=False,
+            scale_=(globscale, "m"), p=10, timescale_=(1, "s"))
+    graphEnergies("Glob.bin", p=10)
+    graphEnergies("Glob.bin", True, p=10)
