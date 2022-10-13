@@ -9,14 +9,20 @@ from Animate import animateFile, graphEnergies
 
 c = 3 * 10**8 # m.s^-1
 G = 6.67 * 10**-11 # m^3.s^-2.kg^-1 = c^2.s.kg^-1
-M = 1.988 * 10**30 # kg
-m = 5.97 * 10**24 # kg
-aph = 1.5210 * 10**11 # m
-sem = 1.4960 * 10**11 # m
+M = 1.988 * 10**30 # kg, Sun
 
-solarscale = aph
+m_earth = 5.9723 * 10**24 # kg
+aph_ear = 1.5210 * 10**11 # m
+sem_ear = 1.4960 * 10**11 # m
+
+m_jup = 1.8986 * 10**27 # kg
+aph_jup = 816.62 * 10**9 # m
+sem_jup = 778.57 * 10**9 # m
+
+solarscale = aph_ear
+solarplusscale = aph_jup
 globscale = 1
-scale = globscale
+scale = solarplusscale
 timestepB = 100
 
 logscale = 1 / np.log(scale/timestepB + 1)
@@ -138,11 +144,11 @@ class System:
 
 def solarExample():
     a = System(0.1 * 60 * 60, file="Solar.bin") # 0.1 hour, in s
-    vplan = (G * M * (2/aph - 1/sem))**0.5
+    vplan = (G * M * (2/aph_ear - 1/sem_ear))**0.5
     # motion of the sun is to effectively conserve momentum so 
     # the system stays fixed at (0,0)
-    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m / M * vplan, 0.0) # Sun
-    a.AddParticle(m, aph, 0.0, 0.0, 0.0, vplan, 0.0)
+    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_earth / M * vplan, 0.0) # Sun
+    a.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, vplan, 0.0)
     # #print(a.Particles[:,:,0])
     for _ in range(366):
         a.Record()
@@ -154,7 +160,7 @@ def solarExample():
     graphEnergies("Solar.bin", True)
     a.File.close()
 
-if __name__=="__main__":
+def globClust():
     # globular cluster
     # a = System(1, file="Glob.bin")
 
@@ -169,3 +175,33 @@ if __name__=="__main__":
             scale_=(globscale, "m"), p=10, timescale_=(1, "s"))
     graphEnergies("Glob.bin", p=10)
     graphEnergies("Glob.bin", True, p=10)
+
+def earthSunJupiter():
+    f = "SolarPlus.bin"
+    a = System(1 * 60 * 60, file=f) # 1 hour, in s
+    v_earth = (G * M * (2/aph_ear - 1/sem_ear))**0.5
+    v_jup = (G * M * (2/aph_jup - 1/sem_jup))**0.5
+    # motion of the sun is to effectively conserve momentum so 
+    # the system stays fixed at (0,0)
+    # SUN
+    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_earth / M * v_earth + m_jup / M * v_jup, 0.0) # Sun
+    # EARTH
+    a.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, v_earth, 0.0)
+    # JUPTIER
+    a.AddParticle(m_jup, -aph_jup, 0, 0, 0, -v_jup, 0)
+    total = int(4333 * 100)
+    for q in range(total):
+        if (100*((q+1) / total)) % 10 == 0:
+            print(100*(q+1) / total, "%")
+        a.Record()
+        a.doTimestep(24*60*60)
+    a.Record()
+    # framesskip = 20 days
+    animateFile(f, framesskip=20, repeat=False,
+            scale_=(scale, "♃ semimajoraxis"), p=3, timescale_=(365.25*24*60*60, "years"))
+    graphEnergies(f, p=3)
+    graphEnergies(f, True, p=3)
+    a.File.close()  
+
+if __name__=="__main__":
+    earthSunJupiter()
