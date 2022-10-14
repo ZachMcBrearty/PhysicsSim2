@@ -39,10 +39,10 @@ if system_ in ["Solar", "SolarPlus", "GlobClust"]:
             DEFAULTFILE = "SolarPlus.bin"
     else:
         G = 1
-        globscale = 2
+        globscale = 2 # r = scale/2 = 1
         scale = (globscale, "arb unit")
         timescale = (1, "s")
-        smooth = 0.1
+        smooth = 0.05
 
         DEFAULTFILE = "GlobSim.bin"
     
@@ -182,7 +182,7 @@ def solarExample():
 
 def globClust():
     # globular cluster
-    a = System(0.01, file=DEFAULTFILE)
+    a = System(0.1, file=DEFAULTFILE)
     p = 100
     for _ in range(p):
         # sphere radius scale / 2
@@ -198,13 +198,7 @@ def globClust():
         if 100*(t+1)/n % 10 == 0:
             print(100*(t+1)/n,"%")
         a.Record()
-        a.doTimestep(0.1)
-    setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
-               timescale_=timescale)
-    animateFile(DEFAULTFILE, p=p, 
-                frameskip=1, repeat=False)
-    graphEnergies(DEFAULTFILE, False, p=p)
-    graphEnergies(DEFAULTFILE, True,  p=p)
+        a.doTimestep(0.2)
 
 def earthSunJupiter():
     DEFAULTFILE = "SolarPlus20yr.bin"
@@ -236,3 +230,10 @@ def earthSunJupiter():
 if __name__=="__main__":
     # earthSunJupiter()
     globClust()
+    p=100
+    setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
+               timescale_=timescale)
+    animateFile(DEFAULTFILE, p=p, 
+                frameskip=1, repeat=False)
+    graphEnergies(DEFAULTFILE, False, p=p)
+    graphEnergies(DEFAULTFILE, True,  p=p)
