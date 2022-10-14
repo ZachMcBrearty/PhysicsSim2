@@ -12,12 +12,26 @@ ys = []
 times = []
 xdata = []
 ydata = []
-ln, = ax.plot([], [], 'ro')
+ln, = ax.plot([], [], 'ro', ms=5)
 timetext = ax.text(0.05, 0.9,"", transform=ax.transAxes)
 trace = []
+
+widthheight = 1.2
 scale = (1, "m")
 timescale = (1, "s")
-tracelength = 500
+tracelength = -1
+
+def setAnimate(widthheight_=None, scale_=None, 
+               timescale_=None, tracelength_=None):
+    global widthheight, scale, timescale, tracelength
+    if widthheight_ is not None:
+        widthheight = widthheight_
+    if scale_ is not None:
+        scale = scale_
+    if timescale_ is not None:
+        timescale = timescale_
+    if tracelength_ is not None:
+        tracelength = tracelength_
 
 def getData(filename):
     times = [] # 1D
@@ -55,22 +69,14 @@ def getDataBinary(filename, p):
         data = np.delete(data, np.s_[0::n-1])
         data = np.delete(data, np.s_[0::n-2])
         objs = np.reshape(data, (-1, p, 3))
-        # xs = data[0::n-3]
-        # ys = data[1::n-3]
-        # zs = data[2::n-3]
-        # for q in range(p):
-        #     pxs = xs[q  ::3*p]
-        #     pys = ys[q+1::3*p]
-        #     pzs = zs[q+2::3*p]
-        #     obj = np.array([pxs, pys, pzs]).T
-        #     objs.append(obj)
     return times, kinetic, gravi, total, objs
 
 def init():
     global trace
-    ax.set_xlim(-1.2, 1.2)
+    wh = widthheight/scale[0]
+    ax.set_xlim(-wh, wh)
     ax.set_xlabel("x, " + scale[1])
-    ax.set_ylim(-1.2, 1.2)
+    ax.set_ylim(-wh, wh)
     ax.set_ylabel("y, " + scale[1])
     trace = [ax.plot([], [],'-', lw=1)[0] for _ in range(tracenum)]
     return ln, *trace, timetext,
@@ -81,21 +87,19 @@ def animate(i):
     xdata = xs[i]
     ydata = ys[i]
     ln.set_data(xdata, ydata)
-    if i > tracelength:
-        for j, t in enumerate(trace):
-            t.set_data(xs[i-tracelength:i, j], ys[i-tracelength:i, j])
-    else:
+    if tracelength == -1 or i <= tracelength:
         for j, t in enumerate(trace):
             t.set_data(xs[:i, j], ys[:i, j])
+    else:
+        for j, t in enumerate(trace):
+            t.set_data(xs[i-tracelength:i, j], ys[i-tracelength:i, j])
+        
     #timetext.set_text(str(times[i])+"s")
-    timetext.set_text(str(round(times[i], 2))+ " " +timescale[1])
+    timetext.set_text(f"{round(times[i], 2)} / {round(times[-1], 2)}" + " " +timescale[1])
     return ln, *trace, timetext
 
-def animateFile(filename, framesskip=1, repeat=True, scale_=(1, "m"), 
-    p=2, timescale_=(1, "s")):
-    global xs, ys, times, tracenum, scale, timescale
-    timescale = timescale_
-    scale = scale_
+def animateFile(filename, p=2, frameskip=1, **kws):
+    global xs, ys, times, tracenum
     if filename.endswith(".txt"):
         times, kin, grav, total, objs = getData(filename)
     elif filename.endswith(".bin"):
@@ -107,8 +111,8 @@ def animateFile(filename, framesskip=1, repeat=True, scale_=(1, "m"),
     xs = pos[:, :, 0] / scale[0]
     ys = pos[:, :, 1] / scale[0]
 
-    ani = FuncAnimation(fig, animate, frames=range(0, len(pos), framesskip),
-                        init_func=init, blit=True, repeat=repeat)
+    ani = FuncAnimation(fig, animate, frames=frameMaker(0, len(pos), frameskip),
+                        init_func=init, blit=True, **kws)
     
     plt.show()
 
@@ -128,18 +132,23 @@ def graphEnergies(filename, change=False, p=2):
     else:
         te = np.array(total)
         initenergy = te[0]
-        change = te - initenergy
+        change = abs(te - initenergy)
         percchange = 100 * change / initenergy
-        ax.plot(t, percchange, label="PercentChange in Total")
+        ax.plot(t, percchange, label="Percent change in Energy")
         ax.set_ylabel("Percent change in Energy, %")
         ax.set_xlabel("Time, "+timescale[1])
     plt.legend()
+    #plt.get_current_fig_manager().window.raise_()
+    fig.canvas.manager.window.raise_()
     plt.show()
 
+def frameMaker(start, stop, step):
+    for x in range(start, stop, step):
+        yield x
+    yield stop-1
 
 if __name__=="__main__":
     f = "PlanetsSim.txt"
     fbin = "GravitySim.bin"
-    animateFile(fbin, framesskip=1, repeat=False, scale_=10, p=2)
-    #graphEnergies(f)
+    animateFile(fbin, p=2, frameskip=1, repeat=False)
     #graphEnergies(f, True)
