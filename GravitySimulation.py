@@ -3,15 +3,16 @@ from time import time
 import numpy as np
 from io import TextIOWrapper as _TextIOWrapper
 from random import random
+import matplotlib.pyplot as plt
 
 from Animate import setAnimate, animateFile, graphEnergies
+
 
 #G = 1
 system_ = "GlobClust"
 
 if system_ in ["Solar", "SolarPlus", "GlobClust"]:
     if system_ in ["Solar", "SolarPlus"]:
-        c = 3 * 10**8 # m.s^-1
         G = 6.67 * 10**-11 # m^3.s^-2.kg^-1 = c^2.s.kg^-1
     
         M = 1.988 * 10**30 # kg, Sun
@@ -33,18 +34,27 @@ if system_ in ["Solar", "SolarPlus", "GlobClust"]:
             scale = (sem_ear, "A.U.")
             timescale = (365.25*24*60*60, "years")
             DEFAULTFILE = "Solar.bin"
+            p=2
+            fs=365
+            tracelength = -1
         else:
             scale = (sem_ear, "A.U.")
             timescale = (365.25*24*60*60, "years")
             DEFAULTFILE = "SolarPlus.bin"
+            p=3
+            fs=5
+            tracelength = -1
     else:
         G = 1
-        globscale = 2 # r = scale/2 = 1
+        globscale = 20 # r = scale/2 = 1
         scale = (globscale, "arb unit")
         timescale = (1, "s")
         smooth = 0.05
 
         DEFAULTFILE = "GlobSim.bin"
+        p=100
+        fs=1
+        tracelength = 5
     
 timestepB = 100
 logscale = 1 / np.log(scale[0]/timestepB + 1)
@@ -162,6 +172,25 @@ class System:
         print(self.ParticleMasses)
         print(self.Particles)
 
+    def Leapfrog(self):
+        # offset velocity by -1/2 dt
+        l = len(self.Particles)
+        # combinations of i and j to give pairs of numbers.
+        for i, j in combinations(range(l), 2):
+            A = self.Particles[i]
+            B = self.Particles[j]
+            d = A[0] - B[0]
+            dabs = np.sqrt(np.sum(d**2))
+            if self.minDist is None or dabs < self.minDist:
+                self.minDist = dabs # minimum distance in the simulation to calculate timestep
+            F = (G / (dabs**2 + eps**2)**(3/2)) * d # bracket so one number is multiplied onto the array
+            A[2] -= F * self.ParticleMasses[j] # masses multiplied here to avoid
+            B[2] += F * self.ParticleMasses[i] # multiplying then dividing
+        self.CurTimeStep = self.MaxTimeStep * (np.log(self.minDist/timestepB + 1) * logscale + .001)
+        for p in self.Particles:
+            p[1] -= p[2] * self.CurTimeStep / 2
+        
+
 def solarExample():
     a = System(0.1 * 60 * 60, file=DEFAULTFILE) # 0.1 hour, in s
     vplan = (G * M * (2/aph_ear - 1/sem_ear))**0.5
@@ -170,21 +199,58 @@ def solarExample():
     a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_earth / M * vplan, 0.0) # Sun
     a.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, vplan, 0.0)
     # #print(a.Particles[:,:,0])
-    for _ in range(366):
+    a.Record()
+    a.Leapfrog()
+    a.Update()
+    n = 36525
+    for t in range(n):
+        if 100*(t+1)/n % 10 == 0:
+            print(100*(t+1)/n,"%", end=" ")
         a.Record()
         a.doTimestep(24*60*60)
-    # framesskip = 20 days
-    setAnimate(scale_=scale, timescale_=timescale)
-    animateFile(DEFAULTFILE, p=2, frameskip=1, repeat=False)
-    graphEnergies(DEFAULTFILE, False)
-    graphEnergies(DEFAULTFILE, True)
+    a.Record()
     a.File.close()
+
+def variableTimestep():
+    percentchange = []
+    percentchangeLeap = []
+    # 1 day, 6 hours, 1 hour, 10 minutes, 1 minute
+    ts = [24*60*60, 6*60*60, 60*60, 10*60, 60]
+    tmax = 365*24*60*60
+    vplan = (G * M * (2/aph_ear - 1/sem_ear))**0.5
+    for t in ts:
+        print(f"T: {t}", end=" ")
+        a = System(t, file=DEFAULTFILE)
+        a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_earth / M * vplan, 0.0) # Sun
+        a.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, vplan, 0.0)  
+        e0 = a.gravitationalEnergy() + a.kineticEnergy()
+        a.doTimestep(tmax)
+        ef = a.gravitationalEnergy() + a.kineticEnergy()
+        percentchange.append(100*abs((ef - e0) / e0))
+
+        b = System(t, file=DEFAULTFILE)
+        b.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_earth / M * vplan, 0.0) # Sun
+        b.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, vplan, 0.0)  
+        e0 = b.gravitationalEnergy() + b.kineticEnergy()
+        b.Leapfrog()
+        b.Update()
+        b.doTimestep(tmax)
+        ef = b.gravitationalEnergy() + b.kineticEnergy()
+        percentchangeLeap.append(100*abs((ef - e0) / e0))
+
+        a.File.close()
+        b.File.close()
+    print()
+    plt.loglog(ts, percentchange, label="No Leapfrog")
+    plt.loglog(ts, percentchangeLeap, label="Leapfrog")
+    plt.legend()
+    plt.show()
 
 def globClust():
     # globular cluster
-    a = System(0.1, file=DEFAULTFILE)
+    a = System(0.02, file=DEFAULTFILE)
     p = 100
-    for _ in range(p):
+    for _ in range(p-1):
         # sphere radius scale / 2
         R = scale[0] * (random()-0.5)
         theta = random() * 2 * np.pi
@@ -193,47 +259,72 @@ def globClust():
         y = R * np.sin(theta) * np.sin(phi)
         z = R * np.cos(theta)
         a.AddParticle(0.01, x, y, z)
-    n=100
+    R = scale[0] * (random()-0.5)
+    theta = random() * 2 * np.pi
+    phi = random() * np.pi
+    x = R * np.sin(theta) * np.cos(phi)
+    y = R * np.sin(theta) * np.sin(phi)
+    z = R * np.cos(theta)
+    a.AddParticle(1, x, y, z) # add one massive particle
+
+    n=1000
     for t in range(n):
         if 100*(t+1)/n % 10 == 0:
-            print(100*(t+1)/n,"%")
+            print(100*(t+1)/n,"%", end=" ")
         a.Record()
-        a.doTimestep(0.2)
+        a.doTimestep()
+    a.File.close()
 
 def earthSunJupiter():
     DEFAULTFILE = "SolarPlus20yr.bin"
-    # a = System(1 * 60 * 60, file=DEFAULTFILE) # 1 hour, in s
-    # v_earth = (G * M * (2/aph_ear - 1/sem_ear))**0.5
-    # v_jup = (G * M * (2/aph_jup - 1/sem_jup))**0.5
-    # # motion of the sun is to effectively conserve momentum so 
-    # # the system stays fixed at (0,0)
-    # # SUN
-    # a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_earth / M * v_earth + m_jup / M * v_jup, 0.0) # Sun
-    # # EARTH
-    # a.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, v_earth, 0.0)
-    # # JUPTIER
-    # a.AddParticle(m_jup, -aph_jup, 0, 0, 0, -v_jup, 0)
-    # total = int(365.25 * 100) #int(4333 * 100)
-    # for q in range(total):
-    #     if (100*((q+1) / total)) % 10 == 0:
-    #         print(100*(q+1) / total, "%")
-    #     a.Record()
-    #     a.doTimestep(24*60*60)
-    # a.Record()
+    a = System(1 * 60 * 60, file=DEFAULTFILE) # 1 hour, in s
+    v_earth = (G * M * (2/aph_ear - 1/sem_ear))**0.5
+    v_jup = (G * M * (2/aph_jup - 1/sem_jup))**0.5
+    # motion of the sun is to effectively conserve momentum so 
+    # the system stays fixed at (0,0)
+    # SUN
+    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_earth / M * v_earth + m_jup / M * v_jup, 0.0) # Sun
+    # EARTH
+    a.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, v_earth, 0.0)
+    # JUPTIER
+    a.AddParticle(m_jup, -aph_jup, 0, 0, 0, -v_jup, 0)
+    total = int(365.25 * 100) #int(4333 * 100)
+    a.Record()
+    a.Leapfrog()
+    a.Update()
+    for q in range(total):
+        if (100*((q+1) / total)) % 10 == 0:
+            print(100*(q+1) / total, "%", end=" ")
+        a.Record()
+        a.doTimestep(24*60*60)
+    a.Record()
     # framesskip = 20 days
-    setAnimate(solarplusscale*1.2, scale, timescale)
-    animateFile(DEFAULTFILE, p=3, frameskip=365, repeat=False)
-    graphEnergies(DEFAULTFILE, False, p=3)
-    graphEnergies(DEFAULTFILE, True,  p=3)
-    # a.File.close()  
+    a.File.close()  
 
 if __name__=="__main__":
-    # earthSunJupiter()
-    globClust()
-    p=100
+    if True:
+        t0 = time()
+        if system_ == "Solar":
+            solarExample()
+        elif system_ == "SolarPlus":
+            earthSunJupiter()
+        else:
+            globClust()
+        t1 = time()
+        te = (t1-t0)
+        if te > 60*60:
+            print("Time taken:", te/3600, "hours")
+        elif te > 60:
+            print("Time taken:", te/60, "seconds")
+        else:
+            print("Time taken:", te, "seconds")
+        
+
     setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
-               timescale_=timescale)
+               timescale_=timescale, tracelength_=tracelength)
     animateFile(DEFAULTFILE, p=p, 
-                frameskip=1, repeat=False)
+                frameskip=fs, repeat=True)
     graphEnergies(DEFAULTFILE, False, p=p)
     graphEnergies(DEFAULTFILE, True,  p=p)
+
+    # variableTimestep()
