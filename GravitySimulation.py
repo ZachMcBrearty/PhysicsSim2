@@ -88,7 +88,9 @@ class System:
         for i, j in combinations(range(l), 2):
             A = self.Particles[i]
             B = self.Particles[j]
-            d = A[0] - B[0]
+            d1 = (A[0] - B[0]) % scale[0]
+            d2 = (B[0] - A[0]) % scale[0]
+            d = max([d1, d2])
             dabs = np.sqrt(np.sum(d**2))
             if self.minDist is None or dabs < self.minDist:
                 self.minDist = dabs # minimum distance in the simulation to calculate timestep
