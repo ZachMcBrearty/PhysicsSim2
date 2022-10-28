@@ -52,7 +52,7 @@ if system_ in ["Solar", "SolarPlus", "GlobClust"]:
         smooth = 0.05
 
         DEFAULTFILE = "GlobSim.bin"
-        p=100
+        p=20
         fs=1
         tracelength = 5
     
@@ -90,7 +90,7 @@ class System:
             B = self.Particles[j]
             d1 = (A[0] - B[0]) % scale[0]
             d2 = (B[0] - A[0]) % scale[0]
-            d = max([d1, d2])
+            d = np.array([max(a, b) for a, b in zip(d1, d2)])
             dabs = np.sqrt(np.sum(d**2))
             if self.minDist is None or dabs < self.minDist:
                 self.minDist = dabs # minimum distance in the simulation to calculate timestep
@@ -104,6 +104,7 @@ class System:
         on the current time step"""  
         updateMatrix = np.array([[1, self.CurTimeStep, 0],[0, 1, self.CurTimeStep],[0, 0, 0]])
         self.Particles = updateMatrix @ self.Particles
+        self.Particles[:, 0] %= scale[0]
         self.minDist = scale[0]
         self.time += self.CurTimeStep
         # for particle in self.Particles:
@@ -157,7 +158,9 @@ class System:
         for i, j in combinations(range(l), 2):
             A = self.Particles[i]
             B = self.Particles[j]
-            d = A[0] - B[0]
+            d1 = (A[0] - B[0]) % scale[0]
+            d2 = (B[0] - A[0]) % scale[0]
+            d = np.array([max(a, b) for a, b in zip(d1, d2)])
             dabs = np.sqrt(np.sum(d**2))
             Et -= (G * self.ParticleMasses[i] * self.ParticleMasses[j] / (dabs**2 + eps**2)**(1/2))
         return Et
@@ -167,7 +170,7 @@ class System:
         state -> time, energy, position"""
         kin = self.kineticEnergy()
         grav = self.gravitationalEnergy()
-        a = [self.time, kin, grav] + list(self.Particles[:, 0].flatten())
+        a = [self.time, kin, grav] + list((self.Particles[:, 0]-scale[0]/2).flatten())
         np.array(a).tofile(self.File)
 
     def print(self):
@@ -250,35 +253,24 @@ def variableTimestep():
 
 def globClust():
     # globular cluster
-    a = System(0.02, file=DEFAULTFILE)
-    p = 100
-    for _ in range(p-1):
+    a = System(0.1, file=DEFAULTFILE)
+    for _ in range(p):
         # sphere radius scale / 2
-        R = scale[0] * (random()-0.5)
-        theta = random() * 2 * np.pi
-        phi = random() * np.pi
-        x = R * np.sin(theta) * np.cos(phi)
-        y = R * np.sin(theta) * np.sin(phi)
-        z = R * np.cos(theta)
+        x = scale[0] * random()
+        y = scale[0] * random()
+        z = scale[0] * random()
         a.AddParticle(0.01, x, y, z)
-    R = scale[0] * (random()-0.5)
-    theta = random() * 2 * np.pi
-    phi = random() * np.pi
-    x = R * np.sin(theta) * np.cos(phi)
-    y = R * np.sin(theta) * np.sin(phi)
-    z = R * np.cos(theta)
-    a.AddParticle(1, x, y, z) # add one massive particle
 
     n=1000
     for t in range(n):
         if 100*(t+1)/n % 10 == 0:
             print(100*(t+1)/n,"%", end=" ")
         a.Record()
-        a.doTimestep()
+        a.doTimestep(1)
     a.File.close()
 
 def earthSunJupiter():
-    DEFAULTFILE = "SolarPlus20yr.bin"
+    #DEFAULTFILE = "SolarPlus20yr.bin"
     a = System(1 * 60 * 60, file=DEFAULTFILE) # 1 hour, in s
     v_earth = (G * M * (2/aph_ear - 1/sem_ear))**0.5
     v_jup = (G * M * (2/aph_jup - 1/sem_jup))**0.5
@@ -290,7 +282,7 @@ def earthSunJupiter():
     a.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, v_earth, 0.0)
     # JUPTIER
     a.AddParticle(m_jup, -aph_jup, 0, 0, 0, -v_jup, 0)
-    total = int(365.25 * 100) #int(4333 * 100)
+    total = int(365.25 * 400) #int(4333 * 100)
     a.Record()
     a.Leapfrog()
     a.Update()
