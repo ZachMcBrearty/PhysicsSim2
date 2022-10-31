@@ -142,13 +142,40 @@ def graphEnergies(filename, change=False, p=2):
     fig.canvas.manager.window.raise_()
     plt.show()
 
+def graphR(filename):
+    fig, ax = plt.subplots()
+    if filename.endswith(".txt"):
+        times, *_, objs = getData(filename)
+    elif filename.endswith(".bin"):
+        times, *_, objs = getDataBinary(filename, 3)
+    t = times / timescale[0]
+    objs = objs / scale[0]
+    sun = objs[:, 0]
+    earth = objs[:, 1]
+    Rearth = np.sqrt(np.average(earth**2, axis=1))
+    NormREarth = Rearth / Rearth[0]
+    jupiter = objs[:, 2]
+    RJup = np.sqrt(np.average(jupiter**2, axis=1))
+    NormRJup = RJup / RJup[0]
+    ax.plot(t, NormREarth, label="Earth Orbital Distance")
+    ax.plot(t, NormRJup, label="Jupiter Orbital Distance")
+    ax.set_ylabel("Distance, " + scale[1])
+    ax.set_xlabel("Time, " + timescale[1])
+
+    plt.legend()
+    #plt.get_current_fig_manager().window.raise_()
+    fig.canvas.manager.window.raise_()
+    plt.show()
+
 def frameMaker(start, stop, step):
     for x in range(start, stop, step):
         yield x
     yield stop-1
 
 if __name__=="__main__":
-    f = "PlanetsSim.txt"
-    fbin = "GravitySim.bin"
-    animateFile(fbin, p=2, frameskip=1, repeat=False)
+    # f = "PlanetsSim.txt"
+    # fbin = "GravitySim.bin"
+    # animateFile(fbin, p=2, frameskip=1, repeat=False)
     #graphEnergies(f, True)
+    DEFAULTFILE = "SolarPlus.bin"
+    graphR(DEFAULTFILE)

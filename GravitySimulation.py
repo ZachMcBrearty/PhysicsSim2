@@ -5,7 +5,7 @@ from io import TextIOWrapper as _TextIOWrapper
 from random import random
 import matplotlib.pyplot as plt
 
-from Animate import setAnimate, animateFile, graphEnergies
+from Animate import graphR, setAnimate, animateFile, graphEnergies
 
 
 #G = 1
@@ -100,7 +100,7 @@ class System:
     def Update(self) -> None:
         """Update the positions and velocities of the particles in the system based
         on the current time step"""  
-        updateMatrix = np.array([[1, self.CurTimeStep, 0],[0, 1, self.CurTimeStep],[0, 0, 0]])
+        updateMatrix = np.array([[1, self.CurTimeStep, self.CurTimeStep**2],[0, 1, self.CurTimeStep],[0, 0, 0]])
         self.Particles = updateMatrix @ self.Particles
         self.minDist = scale[0]
         self.time += self.CurTimeStep
@@ -276,10 +276,10 @@ def globClust():
     a.File.close()
 
 def earthSunJupiter():
-    DEFAULTFILE = "SolarPlus20yr.bin"
-    a = System(1 * 60 * 60, file=DEFAULTFILE) # 1 hour, in s
-    v_earth = (G * M * (2/aph_ear - 1/sem_ear))**0.5
-    v_jup = (G * M * (2/aph_jup - 1/sem_jup))**0.5
+    #DEFAULTFILE = "SolarPlus20yr.bin"
+    a = System(0.1 * 60 * 60, file=DEFAULTFILE) # 1 hour, in s
+    v_earth = (G*M/aph_ear)**0.5 #(G * M * (2/aph_ear - 1/sem_ear))**0.5
+    v_jup = (G*M/aph_jup)**0.5 #(G * M * (2/aph_jup - 1/sem_jup))**0.5
     # motion of the sun is to effectively conserve momentum so 
     # the system stays fixed at (0,0)
     # SUN
@@ -288,7 +288,7 @@ def earthSunJupiter():
     a.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, v_earth, 0.0)
     # JUPTIER
     a.AddParticle(m_jup, -aph_jup, 0, 0, 0, -v_jup, 0)
-    total = int(365.25 * 100) #int(4333 * 100)
+    total = int(365.25 * 1000) #int(4333 * 100)
     a.Record()
     a.Leapfrog()
     a.Update()
@@ -302,28 +302,28 @@ def earthSunJupiter():
     a.File.close()  
 
 if __name__=="__main__":
-    if True:
-        t0 = time()
-        if system_ == "Solar":
-            solarExample()
-        elif system_ == "SolarPlus":
-            earthSunJupiter()
-        else:
-            globClust()
-        t1 = time()
-        te = (t1-t0)
-        if te > 60*60:
-            print("Time taken:", te/3600, "hours")
-        elif te > 60:
-            print("Time taken:", te/60, "seconds")
-        else:
-            print("Time taken:", te, "seconds")
+    t0 = time()
+    if system_ == "Solar":
+        solarExample()
+    elif system_ == "SolarPlus":
+        earthSunJupiter()
+    else:
+        globClust()
+    t1 = time()
+    te = (t1-t0)
+    if te > 60*60:
+        print("Time taken:", te/3600, "hours")
+    elif te > 60:
+        print("Time taken:", te/60, "minutes")
+    else:
+        print("Time taken:", te, "seconds")
         
 
     setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
                timescale_=timescale, tracelength_=tracelength)
     animateFile(DEFAULTFILE, p=p, 
-                frameskip=fs, repeat=True)
+                frameskip=365, repeat=True)
+    graphR(DEFAULTFILE)
     graphEnergies(DEFAULTFILE, False, p=p)
     graphEnergies(DEFAULTFILE, True,  p=p)
 
