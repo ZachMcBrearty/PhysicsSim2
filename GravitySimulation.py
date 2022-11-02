@@ -5,11 +5,11 @@ from io import TextIOWrapper as _TextIOWrapper
 from random import random
 import matplotlib.pyplot as plt
 
-from Animate import graphR, setAnimate, animateFile, graphEnergies
+from Animate import graphR, graphRMSr, setAnimate, animateFile, graphEnergies
 
 
 #G = 1
-system_ = "GlobClust"
+system_ = "SolarPlus"
 
 if system_ in ["Solar", "SolarPlus", "GlobClust"]:
     if system_ in ["Solar", "SolarPlus"]:
@@ -211,70 +211,6 @@ def solarExample():
     a.Record()
     a.File.close()
 
-def variableTimestep():
-    percentchange = []
-    percentchangeLeap = []
-    # 1 day, 6 hours, 1 hour, 10 minutes, 1 minute
-    ts = [24*60*60, 6*60*60, 60*60, 10*60, 60]
-    tmax = 365*24*60*60
-    vplan = (G * M * (2/aph_ear - 1/sem_ear))**0.5
-    for t in ts:
-        print(f"T: {t}", end=" ")
-        a = System(t, file=DEFAULTFILE)
-        a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_earth / M * vplan, 0.0) # Sun
-        a.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, vplan, 0.0)  
-        e0 = a.gravitationalEnergy() + a.kineticEnergy()
-        a.doTimestep(tmax)
-        ef = a.gravitationalEnergy() + a.kineticEnergy()
-        percentchange.append(100*abs((ef - e0) / e0))
-
-        b = System(t, file=DEFAULTFILE)
-        b.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_earth / M * vplan, 0.0) # Sun
-        b.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, vplan, 0.0)  
-        e0 = b.gravitationalEnergy() + b.kineticEnergy()
-        b.Leapfrog()
-        b.Update()
-        b.doTimestep(tmax)
-        ef = b.gravitationalEnergy() + b.kineticEnergy()
-        percentchangeLeap.append(100*abs((ef - e0) / e0))
-
-        a.File.close()
-        b.File.close()
-    print()
-    plt.loglog(ts, percentchange, label="No Leapfrog")
-    plt.loglog(ts, percentchangeLeap, label="Leapfrog")
-    plt.legend()
-    plt.show()
-
-def globClust():
-    # globular cluster
-    a = System(0.02, file=DEFAULTFILE)
-    p = 100
-    for _ in range(p-1):
-        # sphere radius scale / 2
-        R = scale[0] * (random()-0.5)
-        theta = random() * 2 * np.pi
-        phi = random() * np.pi
-        x = R * np.sin(theta) * np.cos(phi)
-        y = R * np.sin(theta) * np.sin(phi)
-        z = R * np.cos(theta)
-        a.AddParticle(0.01, x, y, z)
-    R = scale[0] * (random()-0.5)
-    theta = random() * 2 * np.pi
-    phi = random() * np.pi
-    x = R * np.sin(theta) * np.cos(phi)
-    y = R * np.sin(theta) * np.sin(phi)
-    z = R * np.cos(theta)
-    a.AddParticle(1, x, y, z) # add one massive particle
-
-    n=1000
-    for t in range(n):
-        if 100*(t+1)/n % 10 == 0:
-            print(100*(t+1)/n,"%", end=" ")
-        a.Record()
-        a.doTimestep()
-    a.File.close()
-
 def earthSunJupiter():
     #DEFAULTFILE = "SolarPlus20yr.bin"
     a = System(0.1 * 60 * 60, file=DEFAULTFILE) # 1 hour, in s
@@ -301,30 +237,80 @@ def earthSunJupiter():
     # framesskip = 20 days
     a.File.close()  
 
+def variableTimestep():
+    percentchange = []
+    percentchangeLeap = []
+    # 28 days, 1 day, 6 hours, 1 hour, 10 minutes, 1 minute
+    ts = [28*24*60*60, 24*60*60, 6*60*60, 60*60, 10*60, 60]
+    tmax = 365*24*60*60
+    v_ear = (G * M * (2/aph_ear - 1/sem_ear))**0.5
+    v_jup = (G * M * (2/aph_jup - 1/sem_jup))**0.5
+    for t in ts:
+        print(f"T: {t}", end=" ")
+        a = System(t, file="Variable.bin")
+        a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_earth / M * v_ear + m_jup / M * v_jup, 0.0) # Sun
+        a.AddParticle(m_earth, aph_ear, 0.0, 0.0, 0.0, v_ear, 0.0)  
+        a.AddParticle(m_jup, -aph_jup, 0.0, 0.0, 0.0, -v_jup, 0.0)  
+        e0 = a.gravitationalEnergy() + a.kineticEnergy()
+        a.Leapfrog()
+        a.Update()  
+        a.doTimestep(tmax)
+        ef = a.gravitationalEnergy() + a.kineticEnergy()
+        percentchange.append(100*abs((ef - e0) / e0))
+
+        a.File.close()
+    print()
+    plt.loglog(ts, percentchange, "b+")
+    plt.plot(ts, percentchange, "b+")
+    plt.xlabel("Timestep, s")
+    plt.ylabel("Percent change in energy, %")
+    plt.show()
+
+def globClust():
+    # globular cluster
+    a = System(0.2, file=DEFAULTFILE)
+    p = 100
+    for _ in range(p):
+        # sphere radius scale / 2
+        R = scale[0] * (random()-0.5)
+        theta = random() * 2 * np.pi
+        phi = random() * np.pi
+        x = R * np.sin(theta) * np.cos(phi)
+        y = R * np.sin(theta) * np.sin(phi)
+        z = R * np.cos(theta)
+        a.AddParticle(0.01, x, y, z)
+    n=1000
+    for t in range(n):
+        if 100*(t+1)/n % 10 == 0:
+            print(100*(t+1)/n,"%", end=" ")
+        a.Record()
+        a.doTimestep(0.2)
+    a.File.close()
+
 if __name__=="__main__":
-    t0 = time()
-    if system_ == "Solar":
-        solarExample()
-    elif system_ == "SolarPlus":
-        earthSunJupiter()
-    else:
-        globClust()
-    t1 = time()
-    te = (t1-t0)
-    if te > 60*60:
-        print("Time taken:", te/3600, "hours")
-    elif te > 60:
-        print("Time taken:", te/60, "minutes")
-    else:
-        print("Time taken:", te, "seconds")
-        
+    # t0 = time()
+    # if system_ == "Solar":
+    #     solarExample()
+    # elif system_ == "SolarPlus":
+    #     earthSunJupiter()
+    # else:
+    #     globClust()
+    # t1 = time()
+    # te = (t1-t0)
+    # if te > 60*60:
+    #     print("Time taken:", te/3600, "hours")
+    # elif te > 60:
+    #     print("Time taken:", te/60, "minutes")
+    # else:
+    #     print("Time taken:", te, "seconds")
 
     setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
                timescale_=timescale, tracelength_=tracelength)
     animateFile(DEFAULTFILE, p=p, 
-                frameskip=365, repeat=True)
-    graphR(DEFAULTFILE)
+                frameskip=1, repeat=True)
+    graphRMSr(DEFAULTFILE, p=p, percent=False)
+    graphRMSr(DEFAULTFILE, p=p, percent=True)
     graphEnergies(DEFAULTFILE, False, p=p)
     graphEnergies(DEFAULTFILE, True,  p=p)
 
-    # variableTimestep()
+    # variableTimestep() # system should be in the solarplus state

@@ -167,6 +167,30 @@ def graphR(filename):
     fig.canvas.manager.window.raise_()
     plt.show()
 
+
+def graphRMSr(filename, p=100, percent=False):
+    fig, ax = plt.subplots()
+    if filename.endswith(".txt"):
+        times, *_, objs = getData(filename)
+    elif filename.endswith(".bin"):
+        times, *_, objs = getDataBinary(filename, p)
+    t = times / timescale[0]
+    objs = objs / scale[0]
+    RMS = np.sqrt(np.average(objs**2, axis=1))
+    if percent:
+        NormRMS = abs(1 - RMS / RMS[0])
+        ax.plot(t, NormRMS, label="% change in RMS")
+        ax.set_ylabel("Distance, % of start")
+    else:
+        ax.plot(t, RMS, label="RMS Distance")
+        ax.set_ylabel("Distance, " + scale[1])
+    ax.set_xlabel("Time, " + timescale[1])
+
+    plt.legend()
+    #plt.get_current_fig_manager().window.raise_()
+    fig.canvas.manager.window.raise_()
+    plt.show()
+
 def frameMaker(start, stop, step):
     for x in range(start, stop, step):
         yield x
