@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 
 from Animate import graphR, graphRMSr, setAnimate, animateFile, graphEnergies
 
+from multiprocessing import Pool
 
 #G = 1
-system_ = "SolarPlus"
+system_ = "GlobClust"
 
 if system_ in ["Solar", "SolarPlus", "GlobClust"]:
     if system_ in ["Solar", "SolarPlus"]:
@@ -84,17 +85,22 @@ class System:
         """Pair up each particle in self.Particles, find the distance between them
         and calculate and add the acceleration they experience due to gravity"""
         l = len(self.Particles)
-        # combinations of i and j to give pairs of numbers.
-        for i, j in combinations(range(l), 2):
+        # combinations of particles to calculate
+        # all the forces simultaneously
+        #Q = 50 # len(self.Particles)
+        with Pool() as p:
+            Fdabs = p.map(calcForce, combinations(self.Particles, 2))
+        F = []
+        minD = Fdabs[0][1]
+        for F_, D in Fdabs:
+            F.append(F_)
+            minD = D if D < minD else minD
+
+        for n, (i, j) in zip(F, combinations(range(l), 2)):
             A = self.Particles[i]
             B = self.Particles[j]
-            d = A[0] - B[0]
-            dabs = np.sqrt(np.sum(d**2))
-            if self.minDist is None or dabs < self.minDist:
-                self.minDist = dabs # minimum distance in the simulation to calculate timestep
-            F = (G / (dabs**2 + eps**2)**(3/2)) * d # bracket so one number is multiplied onto the array
-            A[2] -= F * self.ParticleMasses[j] # masses multiplied here to avoid
-            B[2] += F * self.ParticleMasses[i] # multiplying then dividing
+            A[2] -= n * self.ParticleMasses[j] # masses multiplied here to avoid
+            B[2] += n * self.ParticleMasses[i] # multiplying then dividing
         self.CurTimeStep = self.MaxTimeStep * (np.log(self.minDist/timestepB + 1) * logscale + .001)
 
     def Update(self) -> None:
@@ -189,7 +195,15 @@ class System:
         self.CurTimeStep = self.MaxTimeStep * (np.log(self.minDist/timestepB + 1) * logscale + .001)
         for p in self.Particles:
             p[1] -= p[2] * self.CurTimeStep / 2
-        
+
+def calcForce(AB):
+    # AB = (A, B)
+    A, B = AB
+    d = A[0] - B[0]
+    dabs = np.sqrt(np.sum(d**2))
+    # Force without either mass involved
+    F = (G / (dabs**2 + eps**2)**(3/2)) * d # bracket so one number is multiplied onto the array
+    return F, dabs        
 
 def solarExample():
     a = System(0.1 * 60 * 60, file=DEFAULTFILE) # 0.1 hour, in s
@@ -269,7 +283,7 @@ def variableTimestep():
 def globClust():
     # globular cluster
     a = System(0.2, file=DEFAULTFILE)
-    p = 100
+    p = 101
     for _ in range(p):
         # sphere radius scale / 2
         R = scale[0] * (random()-0.5)
@@ -279,7 +293,7 @@ def globClust():
         y = R * np.sin(theta) * np.sin(phi)
         z = R * np.cos(theta)
         a.AddParticle(0.01, x, y, z)
-    n=1000
+    n=100
     for t in range(n):
         if 100*(t+1)/n % 10 == 0:
             print(100*(t+1)/n,"%", end=" ")
@@ -288,21 +302,21 @@ def globClust():
     a.File.close()
 
 if __name__=="__main__":
-    # t0 = time()
-    # if system_ == "Solar":
-    #     solarExample()
-    # elif system_ == "SolarPlus":
-    #     earthSunJupiter()
-    # else:
-    #     globClust()
-    # t1 = time()
-    # te = (t1-t0)
-    # if te > 60*60:
-    #     print("Time taken:", te/3600, "hours")
-    # elif te > 60:
-    #     print("Time taken:", te/60, "minutes")
-    # else:
-    #     print("Time taken:", te, "seconds")
+    t0 = time()
+    if system_ == "Solar":
+        solarExample()
+    elif system_ == "SolarPlus":
+        earthSunJupiter()
+    else:
+        globClust()
+    t1 = time()
+    te = (t1-t0)
+    if te > 60*60:
+        print("Time taken:", te/3600, "hours")
+    elif te > 60:
+        print("Time taken:", te/60, "minutes")
+    else:
+        print("Time taken:", te, "seconds")
 
     setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
                timescale_=timescale, tracelength_=tracelength)
