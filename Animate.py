@@ -176,7 +176,7 @@ def graphRMSr(filename, p=100, percent=False):
         times, *_, objs = getDataBinary(filename, p)
     t = times / timescale[0]
     objs = objs / scale[0]
-    RMS = np.sqrt(np.average(objs**2, axis=1))
+    RMS = np.sqrt(np.average(objs**2, axis=(1, 2)))
     if percent:
         NormRMS = abs(1 - RMS / RMS[0])
         ax.plot(t, NormRMS, label="% change in RMS")
