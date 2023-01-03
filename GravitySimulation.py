@@ -1,6 +1,7 @@
 from itertools import combinations
 from time import time
 import numpy as np
+import copy
 from io import TextIOWrapper as _TextIOWrapper
 from random import random
 import matplotlib.pyplot as plt
@@ -20,13 +21,17 @@ if system_ == "Solar":
     aph_ear = 1.5210 * 10**11 # m
     sem_ear = 1.4960 * 10**11 # m
 
+    m_jup = 1.8986 * 10**27 # kg
+    aph_jup = 816.62 * 10**9 # m
+    sem_jup = 778.57 * 10**9 # m
+
     solarscale = aph_ear # 1 A.U.
 
     smooth = 0.001
 
     scale = (sem_ear, "A.U.")
     timescale = (365.25*24*60*60, "years")
-    DEFAULTFILE = "SolarCollapse.bin"
+    DEFAULTFILE = "SolarCollapse3.bin"
     p=101
     fs=365
     tracelength = 10
@@ -60,7 +65,7 @@ def vCalcMasslessForce(pairs):
     ds = As - Bs
     dabss = np.sqrt(np.sum(ds**2, axis=1))
     Fs = (G / (dabss**2 + eps**2)**(3/2))[...,None]*ds
-    return Fs, np.min(dabss)
+    return Fs, dabss
 
 class System:
     def __init__(self, MaxTimeStep=100, file=None):
@@ -73,6 +78,7 @@ class System:
         self.CurTimeStep = MaxTimeStep
         self.ParticleMasses = None
         self.Particles = None
+        self.coupled = None
         if file is None: 
             self.File = open(DEFAULTFILE, "wb")
         elif isinstance(file, str):
@@ -81,19 +87,48 @@ class System:
             self.File = file
         self.minDist = scale[0]
 
+    def upperTriIter(self, l):
+        q = np.array(np.triu_indices(l, 1)).T.reshape(-1, 2)
+        l = None
+        for p in q:
+            if self.coupled[p[0]] and self.coupled[p[1]]:
+                if l is None:
+                    l = np.array([p])
+                else:
+                    l = np.append(l, [p], axis=0)
+        return l
+
     def Interaction(self) -> None:
         """Pair up each particle in self.Particles, find the distance between them
         and calculate and add the acceleration they experience due to gravity"""
-        dataset = self.Particles
-        pij = np.array(np.triu_indices(len(dataset), 1)).T.reshape(-1, 2)
-        pairs = dataset[pij]
+        dataset = self.Particles[self.coupled]
+        if len(dataset) == 1:
+            return
+        pij = self.upperTriIter(len(self.Particles))
+        pairs = self.Particles[pij]
 
-        Fs, self.mindist = vCalcMasslessForce(pairs)
-        # combinations of i and j to give pairs of numbers.
+        Fs, dists = vCalcMasslessForce(pairs)
+        self.minDist = np.min(dists)
+        coup = copy.deepcopy(self.coupled)
+        ### combinations of i and j to give pairs of numbers.
         for n, (i, j) in enumerate(pij):
+            if not coup[i] or not coup[j]:
+                print("NOT WORKING")
+                continue
             self.Particles[i][2] -= Fs[n] * self.ParticleMasses[j] # masses multiplied here to avoid
             self.Particles[j][2] += Fs[n] * self.ParticleMasses[i] # multiplying then dividing
-        self.CurTimeStep = self.MaxTimeStep * (np.log(self.minDist/timestepB + 1) * logscale + .001)
+
+        
+        for n, (i, j) in enumerate(pij):
+            if not coup[i] or not coup[j]:
+                print("NOT WORKING")
+                continue
+            if dists[n] < 25*eps:
+                if self.ParticleMasses[i] >= self.ParticleMasses[j]:
+                    self.Couple(i, j)
+                else:
+                    self.Couple(j, i)
+        #self.CurTimeStep = self.MaxTimeStep * (np.log(self.minDist/timestepB + 1) * logscale + .001)
 
     def Update(self) -> None:
         """Update the positions and velocities of the particles in the system based
@@ -103,9 +138,25 @@ class System:
         self.minDist = scale[0]
         self.time += self.CurTimeStep
 
+    def Couple(self, i, j):
+        """set the coupled condition on j and set the mass to 0
+        add the mass of j to i and add the velocities (conserving energy)"""
+        # v_new = p1+p2 / (m1+m2)
+        # conserves momentum but not energy
+        self.Particles[i][1] = (self.ParticleMasses[i]*self.Particles[i][1]  \
+             + self.ParticleMasses[j]*self.Particles[j][1]) / (self.ParticleMasses[i] + self.ParticleMasses[j])
+        # Centre of Mass
+        self.Particles[i][0] = self.Particles[i][0] + (self.Particles[j][0] - self.Particles[i][0]) / (1 + self.ParticleMasses[j] / self.ParticleMasses[i])
+        self.ParticleMasses[i] += self.ParticleMasses[j]
+        # move the other particle out and set the mass to 0, and the coupled condition
+        self.Particles[j] = np.array([[10*scale[0], 10*scale[0], 10*scale[0]], [0, 0, 0], [0, 0, 0]])
+        self.ParticleMasses[j] = 0
+        self.coupled[j] = False
+        print(f"Coupled {i} and {j}, {np.count_nonzero(self.coupled)} particles left", flush=True)
+
     def doTimestep(self, tmin:float = None) -> None:
         """Call self.Interaction then self.Update, variable timestep length"""#
-        if tmin is None:
+        if tmin is None or np.count_nonzero(self.coupled) == 1:
             self.Interaction()
             self.Update()
         else:
@@ -124,18 +175,14 @@ class System:
             self.ParticleMasses = np.array([m])
         else:
             self.ParticleMasses = np.append(self.ParticleMasses, m)
-
         if self.Particles is None:
             self.Particles = np.array([[[x,y,z], [vx,vy,vz], [0.0,0.0,0.0]]])
         else:
             self.Particles = np.append(self.Particles, [[[x,y,z], [vx,vy,vz], [0.0,0.0,0.0]]], axis=0)
-    def AddMultipleParticles(self, particles):
-        '''must be in the format [p1, p2, ...]
-        where pn = [[x, y, z], [vx, vy, vz], [ax, ay, az]]'''
-        if self.Particles is None:
-            self.Particles = np.array(particles)
+        if self.coupled is None:
+            self.coupled = np.array([True])
         else:
-            self.Particles = np.append(self.Particles, particles)
+            self.coupled = np.append(self.coupled, True)
     def kineticEnergy(self):
         """Find and sum all the kinetic energies of the particles in the system"""
         return 0.5 * np.sum(self.ParticleMasses.T @ self.Particles[:,1]**2)
@@ -181,7 +228,6 @@ class System:
 
 vel = lambda aph, sem: (G * M * (2/aph - 1/sem))**.5
 def genRandomPosVel():
-    
     r_aph = scale[0] * (0.9+0.2*random())
     r_sem = r_aph #* (random()/4 + 0.75)
     
@@ -199,22 +245,22 @@ def genRandomPosVel():
     return x, y, z, vx, vy, vz
 
 def solarCollapse(n=100):
-    a = System(0.1 * 60 * 60, file=DEFAULTFILE) # 0.1 hour, in s
-    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0) # Sun
-    
+    a = System(10 * 24 * 60 * 60, file=DEFAULTFILE) # 2 days
+    v_jup = vel(aph_jup, sem_jup)
+    a.AddParticle(M, 0.0, 0.0, 0.0, -m_jup * v_jup / M, 0.0, 0.0) # Sun
+    a.AddParticle(m_jup, aph_jup, 0.0, 0.0, +v_jup, 0.0, 0.0) # Jupiter
     for _ in range(n):
         x, y, z, vx, vy, vz = genRandomPosVel()
         a.AddParticle(m_earth/100, x, y, z, vx, vy, vz) # small mass particle
-
-    a.Record()
     a.Leapfrog()
+    a.Record()
     a.Update()
-    n = 3650
+    n = 365
     for t in range(n):
         if 100*(t)/n % 10 == 0:
             print(100*(t)/n,"%", end=" ",flush=True)
         a.Record()
-        a.doTimestep(24*60*60)
+        a.doTimestep(10*24*60*60)
     print("100%", end=" ", flush=True)
     a.Record()
     a.File.close()
@@ -244,16 +290,32 @@ def randomP():
     x,y,z,vx,vy,vz = genRandomPosVel()
     return np.array([[x,y,z], [vx,vy,vz], [0.0,0.0,0.0]])
 
+def testEnv():
+    te = System(0.01*60*60, file="TEST.bin")
+    te.AddParticle(M, 0,0,0, 0,0,0)
+    te.AddParticle(M, -12*eps,0,0, 0,0,0)
+    te.AddParticle(M, 15*eps,0,0, 0,0,0)
+    te.AddParticle(M, 0,20*eps,0, 0,0,0)
+    te.AddParticle(M, 0,-20*eps,0, 0,0,0)
+    for x in range(200):
+        te.Record() 
+        te.doTimestep(0.01*60*60)
+    te.Record()
+    te.File.close()
+
 if __name__=="__main__":
     from time import perf_counter
     # rms radius and median radius -> half mass radius for glob
-    t0 = perf_counter()
-    solarCollapse(100)
-    t1 = perf_counter()
-    print(t1 - t0, "s")
+    # t0 = perf_counter()
+    # solarCollapse(100)
+    # t1 = perf_counter()
+    # print(t1-t0, "s")
+    # testEnv()
+    # DEFAULTFILE = "TEST.bin"
+    # p=5
     setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
-               timescale_=timescale, tracelength_=tracelength)
-    # animateFile(DEFAULTFILE, p=51, frameskip=1, repeat=False, ax=(0,1))
-    animateFile(DEFAULTFILE, p=51, frameskip=1, repeat=False, ax=(1,2))
-    # animateFile(DEFAULTFILE, p=51, frameskip=1, repeat=False, ax=(0,2))
+                timescale_=timescale, tracelength_=tracelength)
+    animateFile(DEFAULTFILE, p=102, frameskip=1, repeat=False, ax=(0,1))
+    # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(1,2))
+    # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))
     
