@@ -98,7 +98,7 @@ def animate(i):
     timetext.set_text(f"{round(times[i], 2)} / {round(times[-1], 2)}" + " " +timescale[1])
     return ln, *trace, timetext
 
-def animateFile(filename, p=2, frameskip=1, **kws):
+def animateFile(filename, p=2, frameskip=1, ax=(0,1), **kws):
     global xs, ys, times, tracenum
     if filename.endswith(".txt"):
         times, kin, grav, total, objs = getData(filename)
@@ -108,8 +108,8 @@ def animateFile(filename, p=2, frameskip=1, **kws):
     pos = np.array(objs)
     
     times = times / timescale[0]
-    xs = pos[:, :, 0] / scale[0]
-    ys = pos[:, :, 1] / scale[0]
+    xs = pos[:, :, ax[0]] / scale[0]
+    ys = pos[:, :, ax[1]] / scale[0]
 
     ani = FuncAnimation(fig, animate, frames=frameMaker(0, len(pos), frameskip),
                         init_func=init, blit=True, **kws)
