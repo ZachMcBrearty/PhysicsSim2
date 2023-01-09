@@ -57,19 +57,19 @@ def getData(filename):
 
 def getDataBinary(filename, p):
     '''p: expected number of particles'''
-    n = 3 + 3 * p
+    n = 3 + 7 * p
     objs = []
     with open(filename, "rb") as f:
         data = np.fromfile(f)
-        times = data[0::n]
-        kinetic = data[1::n]
-        gravi = data[2::n]
-        total = kinetic + gravi
-        data = np.delete(data, np.s_[0::n])# data[0::n]
-        data = np.delete(data, np.s_[0::n-1])
-        data = np.delete(data, np.s_[0::n-2])
-        objs = np.reshape(data, (-1, p, 3))
-    return times, kinetic, gravi, total, objs
+    data = np.reshape(data, (-1, n))
+    times = data[:, 0]
+    kinetic = data[:, 1]
+    gravi = data[:, 2]
+    total = kinetic + gravi
+    masses = data[:, 3:3+p]
+    objs = data[:, 3+p:]
+    objs = np.reshape(objs, (-1, p, 6))
+    return times, kinetic, gravi, total, masses, objs
 
 def init():
     global trace

@@ -200,11 +200,13 @@ class System:
         return Et
     def Record(self):
         """Record the state of the system to self.File
-        state -> time, energy, position"""
+        state -> time, energy, masses, position velocity"""
         kin = self.kineticEnergy()
         grav = self.gravitationalEnergy()
-        a = [self.time, kin, grav] + list(self.Particles[:, 0].flatten())
-        np.array(a).tofile(self.File)
+        b = [self.time, kin, grav] + list(self.ParticleMasses) + list(self.Particles[:, 0:2].flatten())
+        # a = [self.time, kin, grav] + list(self.Particles[:, 0].flatten())
+        # np.array(a).tofile(self.File)
+        np.array(b).tofile(self.File)
     def print(self):
         print(self.ParticleMasses)
         print(self.Particles)
@@ -291,12 +293,12 @@ def randomP():
     return np.array([[x,y,z], [vx,vy,vz], [0.0,0.0,0.0]])
 
 def testEnv():
-    te = System(0.01*60*60, file="TEST.bin")
-    te.AddParticle(M, 0,0,0, 0,0,0)
-    te.AddParticle(M, -12*eps,0,0, 0,0,0)
-    te.AddParticle(M, 15*eps,0,0, 0,0,0)
-    te.AddParticle(M, 0,20*eps,0, 0,0,0)
-    te.AddParticle(M, 0,-20*eps,0, 0,0,0)
+    te = System(0.001*60*60, file="TEST.bin")
+    # te.AddParticle(M, 0,0,0, 0,0,0)
+    te.AddParticle(M, 0,15*eps,0, 0,-0.2*eps,0)
+    te.AddParticle(M, 15*eps,0,0, -0.2*eps,0,0)
+    # te.AddParticle(M, 0,20*eps,0, 0,0,0)
+    # te.AddParticle(M, 0,-20*eps,0, 0,0,0)
     for x in range(200):
         te.Record() 
         te.doTimestep(0.01*60*60)
@@ -312,10 +314,13 @@ if __name__=="__main__":
     # print(t1-t0, "s")
     # testEnv()
     # DEFAULTFILE = "TEST.bin"
-    # p=5
+    # p=2 # scale[0]*1.2
     setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
                 timescale_=timescale, tracelength_=tracelength)
     animateFile(DEFAULTFILE, p=102, frameskip=1, repeat=False, ax=(0,1))
+
+    graphEnergies(DEFAULTFILE, False, p=102)
+    graphEnergies(DEFAULTFILE, True, p=102)
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(1,2))
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))
     
