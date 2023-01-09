@@ -86,13 +86,13 @@ def animate(i):
     i = int(i)
     xdata = xs[i]
     ydata = ys[i]
-    ln.set_data(xdata, ydata)
+    ln.set_data(xdata-xdata[0], ydata-ydata[0])
     if tracelength == -1 or i <= tracelength:
         for j, t in enumerate(trace):
-            t.set_data(xs[:i, j], ys[:i, j])
+            t.set_data(xs[:i, j]-xdata[0], ys[:i, j]-ydata[0])
     else:
         for j, t in enumerate(trace):
-            t.set_data(xs[i-tracelength:i, j], ys[i-tracelength:i, j])
+            t.set_data(xs[i-tracelength:i+1, j]-xdata[0], ys[i-tracelength:i+1, j]-ydata[0])
         
     #timetext.set_text(str(times[i])+"s")
     timetext.set_text(f"{round(times[i], 2)} / {round(times[-1], 2)}" + " " +timescale[1])

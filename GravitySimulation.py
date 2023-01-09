@@ -31,10 +31,10 @@ if system_ == "Solar":
 
     scale = (sem_ear, "A.U.")
     timescale = (365.25*24*60*60, "years")
-    DEFAULTFILE = "SolarCollapse3.bin"
-    p=101
+    DEFAULTFILE = "SolarCollapse4.bin"
+    p=1002
     fs=365
-    tracelength = 10
+    tracelength = 2
 else:
     G = 1
     globscale = 20 # r = scale/2 = 1
@@ -156,7 +156,7 @@ class System:
 
     def doTimestep(self, tmin:float = None) -> None:
         """Call self.Interaction then self.Update, variable timestep length"""#
-        if tmin is None or np.count_nonzero(self.coupled) == 1:
+        if tmin is None or np.count_nonzero(self.coupled) == 1 or tmin <= self.CurTimeStep:
             self.Interaction()
             self.Update()
         else:
@@ -255,12 +255,12 @@ def solarCollapse(n=100):
     a.Leapfrog()
     a.Record()
     a.Update()
-    n = 365
+    n = round(3650/2)
     for t in range(n):
         if 100*(t)/n % 10 == 0:
             print(100*(t)/n,"%", end=" ",flush=True)
         a.Record()
-        a.doTimestep(10*24*60*60)
+        a.doTimestep()#19*24*60*60)
     print("100%", end=" ", flush=True)
     a.Record()
     a.File.close()
@@ -280,7 +280,7 @@ def globClust():
         a.AddParticle(0.01, x, y, z)
     n=1000
     for t in range(n):
-        if 100*(t+1)/n % 10 == 0:
+        if 100*(t+1)/n % 5 == 0:
             print(100*(t+1)/n,"%", end=" ")
         a.Record()
         a.doTimestep(0.2)
@@ -307,15 +307,16 @@ if __name__=="__main__":
     from time import perf_counter
     # rms radius and median radius -> half mass radius for glob
     # t0 = perf_counter()
-    # solarCollapse(100)
+    # solarCollapse(p-2)
     # t1 = perf_counter()
     # print(t1-t0, "s")
+
     # testEnv()
     # DEFAULTFILE = "TEST.bin"
     # p=5
+
     setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
                 timescale_=timescale, tracelength_=tracelength)
-    animateFile(DEFAULTFILE, p=102, frameskip=1, repeat=False, ax=(0,1))
+    animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,1))
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(1,2))
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))
-    

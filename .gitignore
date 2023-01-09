@@ -18,3 +18,4 @@ GlobSim.bin
 SolarPlus20yr.bin
 Variable.bin
 nptest.py
+*.bin
