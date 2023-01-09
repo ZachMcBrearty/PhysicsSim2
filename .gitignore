@@ -7,14 +7,6 @@ PlanetsPositionsEnergy*.txt
 .vscode/*
 __pycache__/*
 GravSimPython.txt
-GravitySim.bin
 Planets.exe
-Glob.bin
-GravitySim.bin
-__pycache__/Constants.cpython-39.pyc
-__pycache__/Constants.cpython-39.pyc
-SolarPlus.bin
-GlobSim.bin
-SolarPlus20yr.bin
-Variable.bin
+*.bin
 nptest.py

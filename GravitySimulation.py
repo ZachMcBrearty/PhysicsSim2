@@ -31,7 +31,7 @@ if system_ == "Solar":
 
     scale = (sem_ear, "A.U.")
     timescale = (365.25*24*60*60, "years")
-    DEFAULTFILE = "SolarCollapse3.bin"
+    DEFAULTFILE = "SolarCollapseJ1.bin"
     p=101
     fs=365
     tracelength = 10
@@ -143,6 +143,7 @@ class System:
         add the mass of j to i and add the velocities (conserving energy)"""
         # v_new = p1+p2 / (m1+m2)
         # conserves momentum but not energy
+        print(f"Coupled {i} {self.ParticleMasses[i] :.3} and {j} {self.ParticleMasses[j] :.3}, {np.count_nonzero(self.coupled)} particles left", flush=True)
         self.Particles[i][1] = (self.ParticleMasses[i]*self.Particles[i][1]  \
              + self.ParticleMasses[j]*self.Particles[j][1]) / (self.ParticleMasses[i] + self.ParticleMasses[j])
         # Centre of Mass
@@ -152,8 +153,7 @@ class System:
         self.Particles[j] = np.array([[10*scale[0], 10*scale[0], 10*scale[0]], [0, 0, 0], [0, 0, 0]])
         self.ParticleMasses[j] = 0
         self.coupled[j] = False
-        print(f"Coupled {i} and {j}, {np.count_nonzero(self.coupled)} particles left", flush=True)
-
+        
     def doTimestep(self, tmin:float = None) -> None:
         """Call self.Interaction then self.Update, variable timestep length"""#
         if tmin is None or np.count_nonzero(self.coupled) == 1:
@@ -249,20 +249,20 @@ def genRandomPosVel():
 def solarCollapse(n=100):
     a = System(10 * 24 * 60 * 60, file=DEFAULTFILE) # 2 days
     v_jup = vel(aph_jup, sem_jup)
-    a.AddParticle(M, 0.0, 0.0, 0.0, -m_jup * v_jup / M, 0.0, 0.0) # Sun
-    a.AddParticle(m_jup, aph_jup, 0.0, 0.0, +v_jup, 0.0, 0.0) # Jupiter
+    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_jup * v_jup / M, 0.0) # Sun
+    a.AddParticle(m_jup, aph_jup, 0.0, 0.0, 0.0, +v_jup, 0.0) # Jupiter
     for _ in range(n):
         x, y, z, vx, vy, vz = genRandomPosVel()
         a.AddParticle(m_earth/100, x, y, z, vx, vy, vz) # small mass particle
     a.Leapfrog()
     a.Record()
     a.Update()
-    n = 365
+    n = 3650
     for t in range(n):
         if 100*(t)/n % 10 == 0:
             print(100*(t)/n,"%", end=" ",flush=True)
         a.Record()
-        a.doTimestep(10*24*60*60)
+        a.doTimestep()
     print("100%", end=" ", flush=True)
     a.Record()
     a.File.close()
