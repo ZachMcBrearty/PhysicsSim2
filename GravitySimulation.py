@@ -31,8 +31,8 @@ if system_ == "Solar":
 
     scale = (sem_ear, "A.U.")
     timescale = (365.25*24*60*60, "years")
-    DEFAULTFILE = "SolarCollapse4.bin"
-    p=1002
+    DEFAULTFILE = "SolarCollapseJ1.bin"
+    p=101
     fs=365
     tracelength = 2
 else:
@@ -143,6 +143,7 @@ class System:
         add the mass of j to i and add the velocities (conserving energy)"""
         # v_new = p1+p2 / (m1+m2)
         # conserves momentum but not energy
+        print(f"Coupled {i} {self.ParticleMasses[i] :.3} and {j} {self.ParticleMasses[j] :.3}, {np.count_nonzero(self.coupled)} particles left", flush=True)
         self.Particles[i][1] = (self.ParticleMasses[i]*self.Particles[i][1]  \
              + self.ParticleMasses[j]*self.Particles[j][1]) / (self.ParticleMasses[i] + self.ParticleMasses[j])
         # Centre of Mass
@@ -152,8 +153,7 @@ class System:
         self.Particles[j] = np.array([[10*scale[0], 10*scale[0], 10*scale[0]], [0, 0, 0], [0, 0, 0]])
         self.ParticleMasses[j] = 0
         self.coupled[j] = False
-        print(f"Coupled {i} and {j}, {np.count_nonzero(self.coupled)} particles left", flush=True)
-
+        
     def doTimestep(self, tmin:float = None) -> None:
         """Call self.Interaction then self.Update, variable timestep length"""#
         if tmin is None or np.count_nonzero(self.coupled) == 1 or tmin <= self.CurTimeStep:
@@ -200,11 +200,13 @@ class System:
         return Et
     def Record(self):
         """Record the state of the system to self.File
-        state -> time, energy, position"""
+        state -> time, energy, masses, position velocity"""
         kin = self.kineticEnergy()
         grav = self.gravitationalEnergy()
-        a = [self.time, kin, grav] + list(self.Particles[:, 0].flatten())
-        np.array(a).tofile(self.File)
+        b = [self.time, kin, grav] + list(self.ParticleMasses) + list(self.Particles[:, 0:2].flatten())
+        # a = [self.time, kin, grav] + list(self.Particles[:, 0].flatten())
+        # np.array(a).tofile(self.File)
+        np.array(b).tofile(self.File)
     def print(self):
         print(self.ParticleMasses)
         print(self.Particles)
@@ -247,20 +249,20 @@ def genRandomPosVel():
 def solarCollapse(n=100):
     a = System(10 * 24 * 60 * 60, file=DEFAULTFILE) # 2 days
     v_jup = vel(aph_jup, sem_jup)
-    a.AddParticle(M, 0.0, 0.0, 0.0, -m_jup * v_jup / M, 0.0, 0.0) # Sun
-    a.AddParticle(m_jup, aph_jup, 0.0, 0.0, +v_jup, 0.0, 0.0) # Jupiter
+    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_jup * v_jup / M, 0.0) # Sun
+    a.AddParticle(m_jup, aph_jup, 0.0, 0.0, 0.0, +v_jup, 0.0) # Jupiter
     for _ in range(n):
         x, y, z, vx, vy, vz = genRandomPosVel()
         a.AddParticle(m_earth/100, x, y, z, vx, vy, vz) # small mass particle
     a.Leapfrog()
     a.Record()
     a.Update()
-    n = round(3650/2)
+    n = 3650
     for t in range(n):
         if 100*(t)/n % 10 == 0:
             print(100*(t)/n,"%", end=" ",flush=True)
         a.Record()
-        a.doTimestep()#19*24*60*60)
+        a.doTimestep()
     print("100%", end=" ", flush=True)
     a.Record()
     a.File.close()
@@ -291,12 +293,12 @@ def randomP():
     return np.array([[x,y,z], [vx,vy,vz], [0.0,0.0,0.0]])
 
 def testEnv():
-    te = System(0.01*60*60, file="TEST.bin")
-    te.AddParticle(M, 0,0,0, 0,0,0)
-    te.AddParticle(M, -12*eps,0,0, 0,0,0)
-    te.AddParticle(M, 15*eps,0,0, 0,0,0)
-    te.AddParticle(M, 0,20*eps,0, 0,0,0)
-    te.AddParticle(M, 0,-20*eps,0, 0,0,0)
+    te = System(0.001*60*60, file="TEST.bin")
+    # te.AddParticle(M, 0,0,0, 0,0,0)
+    te.AddParticle(M, 0,15*eps,0, 0,-0.2*eps,0)
+    te.AddParticle(M, 15*eps,0,0, -0.2*eps,0,0)
+    # te.AddParticle(M, 0,20*eps,0, 0,0,0)
+    # te.AddParticle(M, 0,-20*eps,0, 0,0,0)
     for x in range(200):
         te.Record() 
         te.doTimestep(0.01*60*60)
@@ -318,5 +320,8 @@ if __name__=="__main__":
     setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
                 timescale_=timescale, tracelength_=tracelength)
     animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,1))
+
+    graphEnergies(DEFAULTFILE, False, p=102)
+    graphEnergies(DEFAULTFILE, True, p=102)
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(1,2))
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))

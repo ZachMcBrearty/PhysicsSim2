@@ -10,6 +10,7 @@ fig.set_figwidth(5)
 xs = []
 ys = []
 times = []
+masses = []
 xdata = []
 ydata = []
 ln, = ax.plot([], [], 'ro', ms=5)
@@ -57,19 +58,19 @@ def getData(filename):
 
 def getDataBinary(filename, p):
     '''p: expected number of particles'''
-    n = 3 + 3 * p
+    n = 3 + 7 * p
     objs = []
     with open(filename, "rb") as f:
         data = np.fromfile(f)
-        times = data[0::n]
-        kinetic = data[1::n]
-        gravi = data[2::n]
-        total = kinetic + gravi
-        data = np.delete(data, np.s_[0::n])# data[0::n]
-        data = np.delete(data, np.s_[0::n-1])
-        data = np.delete(data, np.s_[0::n-2])
-        objs = np.reshape(data, (-1, p, 3))
-    return times, kinetic, gravi, total, objs
+    data = np.reshape(data, (-1, n))
+    times = data[:, 0]
+    kinetic = data[:, 1]
+    gravi = data[:, 2]
+    total = kinetic + gravi
+    masses = data[:, 3:3+p]
+    objs = data[:, 3+p:]
+    objs = np.reshape(objs, (-1, p, 6))
+    return times, kinetic, gravi, total, masses, objs
 
 def init():
     global trace
@@ -86,28 +87,32 @@ def animate(i):
     i = int(i)
     xdata = xs[i]
     ydata = ys[i]
-    ln.set_data(xdata-xdata[0], ydata-ydata[0])
+    ln.set_data(xdata-xdata[0]-xdata[0], ydata-ydata[0]-ydata[0])
     if tracelength == -1 or i <= tracelength:
         for j, t in enumerate(trace):
-            t.set_data(xs[:i, j]-xdata[0], ys[:i, j]-ydata[0])
+            t.set_data(xs[:i, j]-xdata[0]-xdata[0], ys[:i, j]-ydata[0]-ydata[0])
     else:
         for j, t in enumerate(trace):
-            t.set_data(xs[i-tracelength:i+1, j]-xdata[0], ys[i-tracelength:i+1, j]-ydata[0])
+            t.set_data(xs[i-tracelength:i+1, j]-xdata[0]-xdata[0], ys[i-tracelength:i+1, j]-ydata[0]-ydata[0])
         
     #timetext.set_text(str(times[i])+"s")
     timetext.set_text(f"{round(times[i], 2)} / {round(times[-1], 2)}" + " " +timescale[1])
     return ln, *trace, timetext
+
+def convMasstoColour(masses):
+    return masses
 
 def animateFile(filename, p=2, frameskip=1, ax=(0,1), **kws):
     global xs, ys, times, tracenum
     if filename.endswith(".txt"):
         times, kin, grav, total, objs = getData(filename)
     elif filename.endswith(".bin"):
-        times, kin, grav, total, objs = getDataBinary(filename, p)
+        times, kin, grav, total, masses, objs = getDataBinary(filename, p)
     tracenum = len(objs[0])
     pos = np.array(objs)
     
     times = times / timescale[0]
+    masses = convMasstoColour(masses)
     xs = pos[:, :, ax[0]] / scale[0]
     ys = pos[:, :, ax[1]] / scale[0]
 
@@ -121,7 +126,7 @@ def graphEnergies(filename, change=False, p=2):
     if filename.endswith(".txt"):
         times, kin, grav, total, objs = getData(filename)
     elif filename.endswith(".bin"):
-        times, kin, grav, total, objs = getDataBinary(filename, p)
+        times, kin, grav, total, masses, objs = getDataBinary(filename, p)
     t = times / timescale[0]
     if not change:
         ax.plot(t, kin, label="KE")
