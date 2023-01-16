@@ -14,7 +14,7 @@ masses = []
 xdata = []
 ydata = []
 ln, = ax.plot([], [], 'ro', ms=5)
-timetext = ax.text(0.05, 0.9,"", transform=ax.transAxes)
+timetext = ax.text(0.02, 0.95,"", transform=ax.transAxes)
 trace = []
 
 widthheight = 1.2

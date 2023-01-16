@@ -31,8 +31,8 @@ if system_ == "Solar":
 
     scale = (sem_ear, "A.U.")
     timescale = (365.25*24*60*60, "years")
-    DEFAULTFILE = "SolarCollapseJ1.bin"
-    p=101
+    DEFAULTFILE = "SolarCollapseJL.bin"
+    p=102
     fs=365
     tracelength = 2
 else:
@@ -257,13 +257,21 @@ def solarCollapse(n=100):
     a.Leapfrog()
     a.Record()
     a.Update()
-    n = 3650
-    for t in range(n):
-        if 100*(t)/n % 10 == 0:
-            print(100*(t)/n,"%", end=" ",flush=True)
+    n=0
+    while np.count_nonzero(a.coupled) != 3:
         a.Record()
         a.doTimestep()
-    print("100%", end=" ", flush=True)
+        n+=1
+        if n % 100 == 0:
+            print(n, end=" ", flush=True)
+    print(f"Finished after {n}")
+    # n = int(20 * 365.25)
+    # for t in range(n):
+    #     if 100*(t)/n % 10 == 0:
+    #         print(100*(t)/n,"%", end=" ",flush=True)
+    #     a.Record()
+    #     a.doTimestep()
+    # print("100%", end=" ", flush=True)
     a.Record()
     a.File.close()
 
@@ -317,11 +325,11 @@ if __name__=="__main__":
     # DEFAULTFILE = "TEST.bin"
     # p=5
 
-    setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
-                timescale_=timescale, tracelength_=tracelength)
-    animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,1))
+    setAnimate(widthheight_=scale[0]*7.2, scale_=scale, 
+                timescale_=timescale, tracelength_=100)
+    animateFile(DEFAULTFILE, p=p, frameskip=100, repeat=False, ax=(0,1))
 
-    graphEnergies(DEFAULTFILE, False, p=102)
-    graphEnergies(DEFAULTFILE, True, p=102)
+    # graphEnergies(DEFAULTFILE, False, p=102)
+    # graphEnergies(DEFAULTFILE, True, p=102)
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(1,2))
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))
