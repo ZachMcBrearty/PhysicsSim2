@@ -31,10 +31,12 @@ if system_ == "Solar":
 
     scale = (sem_ear, "A.U.")
     timescale = (365.25*24*60*60, "years")
-    DEFAULTFILE = "SolarCollapseJL.bin"
+    DEFAULTFILE = "SolarCollapseJ1.bin"
     p=102
     fs=365
     tracelength = 2
+
+    frameskip = 1
 else:
     G = 1
     globscale = 20 # r = scale/2 = 1
@@ -325,11 +327,11 @@ if __name__=="__main__":
     # DEFAULTFILE = "TEST.bin"
     # p=5
 
-    setAnimate(widthheight_=scale[0]*7.2, scale_=scale, 
-                timescale_=timescale, tracelength_=100)
-    animateFile(DEFAULTFILE, p=p, frameskip=100, repeat=False, ax=(0,1))
+    setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
+                timescale_=timescale, tracelength_=tracelength)
+    animateFile(DEFAULTFILE, p=p, frameskip=frameskip, repeat=False, ax=(0,1))
 
-    # graphEnergies(DEFAULTFILE, False, p=102)
-    # graphEnergies(DEFAULTFILE, True, p=102)
+    graphEnergies(DEFAULTFILE, False, p=p)
+    graphEnergies(DEFAULTFILE, True, p=p)
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(1,2))
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))
