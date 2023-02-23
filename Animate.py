@@ -22,9 +22,12 @@ scale = (1, "m")
 timescale = (1, "s")
 tracelength = -1
 
+shiftToFirstParticle=False
+
 def setAnimate(widthheight_=None, scale_=None, 
-               timescale_=None, tracelength_=None):
-    global widthheight, scale, timescale, tracelength
+               timescale_=None, tracelength_=None, 
+               shiftToFirstParticle_=None):
+    global widthheight, scale, timescale, tracelength, shiftToFirstParticle
     if widthheight_ is not None:
         widthheight = widthheight_
     if scale_ is not None:
@@ -32,29 +35,9 @@ def setAnimate(widthheight_=None, scale_=None,
     if timescale_ is not None:
         timescale = timescale_
     if tracelength_ is not None:
-        tracelength = tracelength_
-
-def getData(filename):
-    times = [] # 1D
-    kinetic = [] # 1D
-    gravitational = [] # 1D
-    total = [] # 1D
-
-    objs = [] # 3D
-    with open(filename, "r") as f:
-        for line in f:
-            time, energies, positions = line.strip().split(" # ")
-            times.append(float(time))
-
-            energies = list(map(float, energies.split(" , ")))
-            kinetic.append(energies[0])
-            gravitational.append(energies[1])
-            total.append(energies[2])#
-
-            pos = positions.split(" * ")
-            pos = [list(map(float, q[1:-1].split(", "))) for q in pos]
-            objs.append(pos)
-    return times, kinetic, gravitational, total, objs
+        tracelength = tracelength
+    if shiftToFirstParticle_ is not None:
+        shiftToFirstParticle = shiftToFirstParticle_
 
 def getDataBinary(filename, p):
     '''p: expected number of particles'''
@@ -87,13 +70,24 @@ def animate(i):
     i = int(i)
     xdata = xs[i]
     ydata = ys[i]
-    ln.set_data(xdata-xdata[0]-xdata[0], ydata-ydata[0]-ydata[0])
-    if tracelength == -1 or i <= tracelength:
-        for j, t in enumerate(trace):
-            t.set_data(xs[:i, j]-xdata[0]-xdata[0], ys[:i, j]-ydata[0]-ydata[0])
+    
+    # ln.set_data(xdata, ydata)
+    if shiftToFirstParticle:
+        ln.set_data(xdata-xdata[0], ydata-ydata[0])
+        if tracelength == -1 or i <= tracelength:
+            for j, t in enumerate(trace):
+                t.set_data(xs[:i, j]-xdata[0], ys[:i, j]-ydata[0])
+        else:
+            for j, t in enumerate(trace):
+                t.set_data(xs[i-tracelength:i+1, j]-xdata[0], ys[i-tracelength:i+1, j]-ydata[0])
     else:
-        for j, t in enumerate(trace):
-            t.set_data(xs[i-tracelength:i+1, j]-xdata[0]-xdata[0], ys[i-tracelength:i+1, j]-ydata[0]-ydata[0])
+        ln.set_data(xdata, ydata)
+        if tracelength == -1 or i <= tracelength:
+            for j, t in enumerate(trace):
+                t.set_data(xs[:i, j], ys[:i, j])
+        else:
+            for j, t in enumerate(trace):
+                t.set_data(xs[i-tracelength:i+1, j], ys[i-tracelength:i+1, j])
         
     #timetext.set_text(str(times[i])+"s")
     timetext.set_text(f"{round(times[i], 2)} / {round(times[-1], 2)}" + " " +timescale[1])
@@ -104,10 +98,7 @@ def convMasstoColour(masses):
 
 def animateFile(filename, p=2, frameskip=1, ax=(0,1), **kws):
     global xs, ys, times, tracenum
-    if filename.endswith(".txt"):
-        times, kin, grav, total, objs = getData(filename)
-    elif filename.endswith(".bin"):
-        times, kin, grav, total, masses, objs = getDataBinary(filename, p)
+    times, kin, grav, total, masses, objs = getDataBinary(filename, p)
     tracenum = len(objs[0])
     pos = np.array(objs)
     
@@ -123,10 +114,10 @@ def animateFile(filename, p=2, frameskip=1, ax=(0,1), **kws):
 
 def graphEnergies(filename, change=False, p=2):
     fig, ax = plt.subplots()
-    if filename.endswith(".txt"):
-        times, kin, grav, total, objs = getData(filename)
-    elif filename.endswith(".bin"):
+    if filename.endswith(".bin"):
         times, kin, grav, total, masses, objs = getDataBinary(filename, p)
+    else:
+        raise ValueError("File extension must be .bin")
     t = times / timescale[0]
     if not change:
         ax.plot(t, kin, label="KE")
@@ -134,24 +125,26 @@ def graphEnergies(filename, change=False, p=2):
         ax.plot(t, total, label="Total Energy")
         ax.set_ylabel("Energy, J")
         ax.set_xlabel("Time, " + timescale[1])
+        plt.legend()
     else:
         te = np.array(total)
-        initenergy = te[0]
-        change = abs(te - initenergy)
-        percchange = 100 * change / initenergy
-        ax.plot(t, percchange, label="Percent change in Energy")
-        ax.set_ylabel("Percent change in Energy, %")
+        # ke = np.array(kin)
+        # gp = np.array(grav)
+        TEpercchange = 100 * (te - te[0]) / te[0]
+        # KEpercchange = 100 * (ke - ke[0]) / ke[0]
+        # GPEpercchange = 100 * (gp - gp[0]) / gp[0]
+    
+        # ax.plot(t, KEpercchange, label="Kinetic Energy")
+        # ax.plot(t, GPEpercchange, label="Gravitational Energy")
+        ax.plot(t, TEpercchange, label="Total Energy")
+        ax.set_ylabel("Change in Total Energy, %")
         ax.set_xlabel("Time, "+timescale[1])
-    plt.legend()
-    #plt.get_current_fig_manager().window.raise_()
     fig.canvas.manager.window.raise_()
     plt.show()
 
 def graphR(filename):
     fig, ax = plt.subplots()
-    if filename.endswith(".txt"):
-        times, *_, objs = getData(filename)
-    elif filename.endswith(".bin"):
+    if filename.endswith(".bin"):
         times, *_, objs = getDataBinary(filename, 3)
     t = times / timescale[0]
     objs = objs / scale[0]
@@ -175,9 +168,7 @@ def graphR(filename):
 
 def graphRMSr(filename, p=100, percent=False):
     fig, ax = plt.subplots()
-    if filename.endswith(".txt"):
-        times, *_, objs = getData(filename)
-    elif filename.endswith(".bin"):
+    if filename.endswith(".bin"):
         times, *_, objs = getDataBinary(filename, p)
     t = times / timescale[0]
     objs = objs / scale[0]
@@ -206,5 +197,5 @@ if __name__=="__main__":
     # fbin = "GravitySim.bin"
     # animateFile(fbin, p=2, frameskip=1, repeat=False)
     #graphEnergies(f, True)
-    DEFAULTFILE = "SolarPlus.bin"
+    DEFAULTFILE = "SolarCollapse.bin"
     graphR(DEFAULTFILE)
