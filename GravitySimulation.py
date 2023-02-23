@@ -27,7 +27,7 @@ if system_ == "Solar":
 
     solarscale = aph_ear # 1 A.U.
 
-    smooth = 0.001
+    smooth = 0.001 # 10^-3
 
     scale = (sem_ear, "A.U.")
     timescale = (365.25*24*60*60, "years")
@@ -116,7 +116,7 @@ class System:
             if not coup[i] or not coup[j]:
                 print("NOT WORKING 1")
                 continue
-            if dists[n] < 5*eps:
+            if dists[n] < 2*eps:
                 if self.ParticleMasses[i] >= self.ParticleMasses[j]:
                     self.Couple(i, j)
                 else:
@@ -256,8 +256,8 @@ def genRandomPosVel():
     vz = 0
     return x, y, z, vx, vy, vz
 
-def solarCollapse(n=100):
-    a = System(10 * 24 * 60 * 60, file=DEFAULTFILE) # 2 days
+def solarCollapseJup(n=100, File=DEFAULTFILE, numYears=50):
+    a = System(10 * 24 * 60 * 60, file=File) # 2 days
     v_jup = vel(aph_jup, sem_jup)
     a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_jup * v_jup / M, 0.0) # Sun
     a.AddParticle(m_jup, aph_jup, 0.0, 0.0, 0.0, +v_jup, 0.0) # Jupiter
@@ -267,15 +267,92 @@ def solarCollapse(n=100):
     a.Leapfrog()
     a.Record()
     a.Update()
-    n = 3650
+    n = int(round(numYears * 365.25, -1))
     for t in range(n):
-        if 100*(t)/n % 10 == 0:
+        if 100*(t)/n % 20 == 0:
             print(100*(t)/n,"%", end=" ",flush=True)
         a.Record()
         a.doTimestep()
     print("100%", end=" ", flush=True)
     a.Record()
     a.File.close()
+
+def solarCollapseNoJup(n=100, File=DEFAULTFILE, numYears=50):
+    a = System(10 * 24 * 60 * 60, file=File) # 2 days
+    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, 0, 0.0) # Sun
+    for _ in range(n):
+        x, y, z, vx, vy, vz = genRandomPosVel()
+        a.AddParticle(m_earth/100, x, y, z, vx, vy, vz) # small mass particle
+    a.Leapfrog()
+    a.Record()
+    a.Update()
+    n = int(round(numYears * 365.25, -1))
+    for t in range(n):
+        if 100*(t)/n % 20 == 0:
+            print(100*(t)/n,"%", end=" ",flush=True)
+        a.Record()
+        a.doTimestep()
+    print("100%", end=" ", flush=True)
+    a.Record()
+    a.File.close()
+
+def globClust():
+    # globular cluster
+    a = System(0.2, file=DEFAULTFILE)
+    p = 100
+    for _ in range(p):
+        # sphere radius scale / 2
+        R = scale[0] * (1+0.2*random())
+        theta = random() * 2 * np.pi
+        phi = random() * np.pi
+        x = R * np.sin(theta) * np.cos(phi)
+        y = R * np.sin(theta) * np.sin(phi)
+        z = R * np.cos(theta)
+        a.AddParticle(0.01, x, y, z)
+    n=1000
+    for t in range(n):
+        if 100*(t+1)/n % 5 == 0:
+            print(100*(t+1)/n,"%", end=" ")
+        a.Record()
+        a.doTimestep(0.2)
+    a.File.close()
+
+def solarSystemTests():
+    m_other   = 0.33011 * 10**24 # mercury
+    sem_other = 57.91   * 10**9
+    # m_other   = 4.8675 * 10**24 # venus
+    # sem_other = 108.21 * 10**9
+    # m_other   = 0.64171 * 10**24 # mars
+    # sem_other = 227.92  * 10**9
+    # m_other   = 1898.19 * 10**24 # Jup
+    # sem_other = 778.57  * 10**9
+    # m_other   = 568.34  * 10**24 # Saturn
+    # sem_other = 1433.53 * 10**9
+    # m_other   = 86.813  * 10**24 # Uranus
+    # sem_other = 2872.46 * 10**9
+    # m_other   = 102.413 * 10**24 # Neptune
+    # sem_other = 4495.06 * 10**9
+    a = System(2 * 24 * 60 * 60, file="SOLARSYSTEST.bin") # 2 days
+    v_other = vel(sem_other, sem_other)
+    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, 0, 0.0) # Sun
+    a.AddParticle(m_other, sem_other, 0.0, 0.0, 0.0, +v_other, 0.0) # Other
+    v_earth = vel(sem_ear, sem_ear)
+    a.AddParticle(m_earth, -sem_ear, 0, 0, 0, -v_earth, 0) # Earth
+    a.Leapfrog()
+    a.Record()
+    a.Update()
+    dur = 100 * 365.25 / 2
+    for n in range(int(dur)):
+        a.Record()
+        a.doTimestep()
+        if n % 1000 == 0:
+            print(n, end=" ", flush=True)
+    a.Record()
+    a.File.close()
+    setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
+                timescale_=timescale, tracelength_=tracelength)
+    animateFile("SOLARSYSTEST.bin", p=3, frameskip=frameskip, repeat=False, ax=(0,1))
+    graphR("SOLARSYSTEST.bin")
 
 def randomP():
     x,y,z,vx,vy,vz = genRandomPosVel()
@@ -310,15 +387,61 @@ def testEnv():
 
 if __name__=="__main__":
     from time import perf_counter
+    from random import seed
+
+    seed(123456789)
+    t0 = perf_counter()
+    solarCollapseNoJup(p-2, f"SolColNoJupL.bin", 200)
+    t1 = perf_counter()
+    q = t1 - t0
+    if q > 3600:
+        print(f"No Jupiter: {q//3600}h {(q%3600)//60}m {q%60}s")
+    elif q > 60:
+        print(f"No Jupiter: {q//60}m {q%60}s") 
+    else:
+        print(f"No Jupiter: {q}s")
+
+    seed(123456789)
+    t0 = perf_counter()
+    solarCollapseJup(p-2, f"SolColJupL.bin", 200)
+    t1 = perf_counter()
+    q = t1 - t0
+    if q > 3600:
+        print(f"Jupiter: {q//3600}h {(q%3600)//60}m {q%60}s")
+    elif q > 60:
+        print(f"Jupiter: {q//60}m {q%60}s")
+    else:
+        print(f"Jupiter: {q}s")
     # rms radius and median radius -> half mass radius for glob
-    # t0 = perf_counter()
-    # solarCollapse(p-2)
-    # t1 = perf_counter()
-    # print(t1-t0, "s")
+    # for j in range(5):
+    #     t0 = perf_counter()
+    #     solarCollapseJup(p-2, f"SolColJup2{j}.bin")
+    #     t1 = perf_counter()
+    #     q = t1 - t0
+    #     if q > 3600:
+    #         print(f"Jupiter {j}: {q//3600}h {(q%3600)//60}m {q%60}s")
+    #     elif q > 60:
+    #         print(f"Jupiter {j}: {q//60}m {q%60}s")
+    #     else:
+    #         print(f"Jupiter {j}: {q}s")
+
+    # for j in range(3, 5):
+    #     t0 = perf_counter()
+    #     solarCollapseNoJup(p-2, f"SolColNoJup2{j}.bin")
+    #     t1 = perf_counter()
+    #     q = t1 - t0
+    #     if q > 3600:
+    #         print(f"No Jupiter {j}: {q//3600}h {(q%3600)//60}m {q%60}s")
+    #     elif q > 60:
+    #         print(f"No Jupiter {j}: {q//60}m {q%60}s")
+    #     else:
+    #         print(f"No Jupiter {j}: {q}s")
 
     testEnv()
     # DEFAULTFILE = "TEST.bin"
     # p=5
+
+    # solarSystemTests()
 
     # setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
     #             timescale_=timescale, tracelength_=tracelength)
@@ -326,5 +449,5 @@ if __name__=="__main__":
 
     # graphEnergies(DEFAULTFILE, False, p=p)
     # graphEnergies(DEFAULTFILE, True, p=p)
-    # # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(1,2))
-    # # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))
+    # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(1,2))
+    # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))
