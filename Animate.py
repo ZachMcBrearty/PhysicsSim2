@@ -7,6 +7,7 @@ from matplotlib.animation import Animation, FuncAnimation
 fig, ax = plt.subplots()
 fig.set_figheight(5)
 fig.set_figwidth(5)
+fig.set_tight_layout(True)
 xs = []
 ys = []
 times = []
@@ -102,7 +103,7 @@ def animate(i):
 def convMasstoColour(masses):
     return masses
 
-def animateFile(filename, p=2, frameskip=1, ax=(0,1), **kws):
+def animateFile(filename, p=2, frameskip=1, ax=(0,1), save=False, **kws):
     global xs, ys, times, tracenum
     if filename.endswith(".txt"):
         times, kin, grav, total, objs = getData(filename)
@@ -118,7 +119,8 @@ def animateFile(filename, p=2, frameskip=1, ax=(0,1), **kws):
 
     ani = FuncAnimation(fig, animate, frames=frameMaker(0, len(pos), frameskip),
                         init_func=init, blit=True, **kws)
-    
+    if save:
+        ani.save(filename.split(".")[0] + ".gif")
     plt.show()
 
 def graphEnergies(filename, change=False, p=2):
@@ -137,8 +139,8 @@ def graphEnergies(filename, change=False, p=2):
     else:
         te = np.array(total)
         initenergy = te[0]
-        change = abs(te - initenergy)
-        percchange = 100 * change / initenergy
+        change = (te - initenergy)
+        percchange = abs(100 * change / initenergy)
         ax.plot(t, percchange, label="Percent change in Energy")
         ax.set_ylabel("Percent change in Energy, %")
         ax.set_xlabel("Time, "+timescale[1])
@@ -149,21 +151,15 @@ def graphEnergies(filename, change=False, p=2):
 
 def graphR(filename):
     fig, ax = plt.subplots()
-    if filename.endswith(".txt"):
-        times, *_, objs = getData(filename)
-    elif filename.endswith(".bin"):
-        times, *_, objs = getDataBinary(filename, 3)
+    times, *_, objs = getDataBinary(filename, 3)
     t = times / timescale[0]
     objs = objs / scale[0]
     sun = objs[:, 0]
-    earth = objs[:, 1]
+    earth = objs[:, 1] - sun
     Rearth = np.sqrt(np.average(earth**2, axis=1))
     NormREarth = Rearth / Rearth[0]
-    jupiter = objs[:, 2]
-    RJup = np.sqrt(np.average(jupiter**2, axis=1))
-    NormRJup = RJup / RJup[0]
+    print(f"Max: {max(NormREarth)}, Min: {min(NormREarth)}, diff: {max(NormREarth)-min(NormREarth)}")
     ax.plot(t, NormREarth, label="Earth Orbital Distance")
-    ax.plot(t, NormRJup, label="Jupiter Orbital Distance")
     ax.set_ylabel("Distance, " + scale[1])
     ax.set_xlabel("Time, " + timescale[1])
 
@@ -171,8 +167,6 @@ def graphR(filename):
     #plt.get_current_fig_manager().window.raise_()
     fig.canvas.manager.window.raise_()
     plt.show()
-
-
 def graphRMSr(filename, p=100, percent=False):
     fig, ax = plt.subplots()
     if filename.endswith(".txt"):
@@ -206,5 +200,20 @@ if __name__=="__main__":
     # fbin = "GravitySim.bin"
     # animateFile(fbin, p=2, frameskip=1, repeat=False)
     #graphEnergies(f, True)
-    DEFAULTFILE = "SolarPlus.bin"
-    graphR(DEFAULTFILE)
+    
+    sem_ear = 1.4960 * 10**11 # m
+    scale = (sem_ear, "A.U.")
+    timescale = (365.25*24*60*60, "years")
+
+    
+    fs=365
+    tracelength = 2
+
+    frameskip = 1
+    p=102
+    DEFAULTFILE = "SolColJup20.bin"
+    setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
+                timescale_=timescale, tracelength_=tracelength)
+    animateFile(DEFAULTFILE, p, save=False)
+    graphEnergies(DEFAULTFILE, False, p)
+    graphEnergies(DEFAULTFILE, True, p)
