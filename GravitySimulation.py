@@ -39,7 +39,7 @@ if system_ == "Solar":
     frameskip = 1
 else:
     G = 1
-    globscale = 20 # r = scale/2 = 1
+    globscale = 20 # r = scale/2 = 11
     scale = (globscale, "arb unit")
     timescale = (1, "s")
     smooth = 0.05
@@ -60,7 +60,13 @@ def calcMasslessForce(pair):
     return F, dabs
 
 def vCalcMasslessForce(pairs):
+    #pairs = [[[[x,y,z],[vx,vy,vz],[ax,ay,az]], 
+    #          [[x,y,z],[vx,vy,vz],[ax,ay,az]]],
+    #         [..., ...], 
+    #         ...]
+    # Every pair, first of the pair, position values
     As = pairs[:, 0, 0]
+    # Every pair, second of the pair, position values
     Bs = pairs[:, 1, 0]
     ds = As - Bs
     dabss = np.sqrt(np.sum(ds**2, axis=1))
@@ -77,7 +83,7 @@ class System:
         if none used the "DEFAULTFILE" value'''
         self.time = 0
         self.MaxTimeStep = MaxTimeStep
-        self.CurTimeStep = MaxTimeStep
+        self.CurTimeStep = MaxTimeStep # currently unused.
         self.ParticleMasses = None
         self.Particles = None
         self.coupled = None
@@ -147,8 +153,6 @@ class System:
         # v_new = p1+p2 / (m1+m2)
         # conserves momentum but not energy
         print(f"t={self.time}; Coupled {i} {self.ParticleMasses[i] :.3} and {j} {self.ParticleMasses[j] :.3}, {np.count_nonzero(self.coupled)-1} particles left", flush=True)
-        # print(f"Particle {i}: {self.Particles[i]}")
-        # print(f"Particle {j}: {self.Particles[j]}")
  
         self.Particles[i][2] = [0, 0, 0]
         self.Particles[i][1] = (self.ParticleMasses[i]*self.Particles[i][1] + self.ParticleMasses[j]*self.Particles[j][1]) / (self.ParticleMasses[i] + self.ParticleMasses[j])
@@ -159,10 +163,6 @@ class System:
         self.Particles[j] = np.array([[10*scale[0], 10*scale[0], 10*scale[0]], [0, 0, 0], [0, 0, 0]])
         self.ParticleMasses[j] = 0
         self.coupled[j] = False
-
-        # print(f"After Particle {i}: {self.Particles[i]}")
-        # print(f"After Particle {j}: {self.Particles[j]}")
-
         
     def doTimestep(self, tmin:float = None) -> None:
         """Call self.Interaction then self.Update, variable timestep length"""#
@@ -267,7 +267,7 @@ def solarCollapseJup(n=100, File=DEFAULTFILE, numYears=50):
     a.Leapfrog()
     a.Record()
     a.Update()
-    n = int(round(numYears * 365.25, -1))
+    n = int(round(numYears * 36.525, -1))
     for t in range(n):
         if 100*(t)/n % 20 == 0:
             print(100*(t)/n,"%", end=" ",flush=True)
@@ -278,7 +278,7 @@ def solarCollapseJup(n=100, File=DEFAULTFILE, numYears=50):
     a.File.close()
 
 def solarCollapseNoJup(n=100, File=DEFAULTFILE, numYears=50):
-    a = System(10 * 24 * 60 * 60, file=File) # 2 days
+    a = System(10 * 24 * 60 * 60, file=File) # 10 days
     a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, 0, 0.0) # Sun
     for _ in range(n):
         x, y, z, vx, vy, vz = genRandomPosVel()
@@ -286,7 +286,7 @@ def solarCollapseNoJup(n=100, File=DEFAULTFILE, numYears=50):
     a.Leapfrog()
     a.Record()
     a.Update()
-    n = int(round(numYears * 365.25, -1))
+    n = int(round(numYears * 36.525, -1))
     for t in range(n):
         if 100*(t)/n % 20 == 0:
             print(100*(t)/n,"%", end=" ",flush=True)
@@ -389,29 +389,29 @@ if __name__=="__main__":
     from time import perf_counter
     from random import seed
 
-    seed(123456789)
-    t0 = perf_counter()
-    solarCollapseNoJup(p-2, f"SolColNoJupL.bin", 200)
-    t1 = perf_counter()
-    q = t1 - t0
-    if q > 3600:
-        print(f"No Jupiter: {q//3600}h {(q%3600)//60}m {q%60}s")
-    elif q > 60:
-        print(f"No Jupiter: {q//60}m {q%60}s") 
-    else:
-        print(f"No Jupiter: {q}s")
+    # seed(123456789)
+    # t0 = perf_counter()
+    # solarCollapseNoJup(p-2, f"SolColNoJupL10000.bin", 10000)
+    # t1 = perf_counter()
+    # q = t1 - t0
+    # if q > 3600:
+    #     print(f"No Jupiter: {q//3600}h {(q%3600)//60}m {q%60}s")
+    # elif q > 60:
+    #     print(f"No Jupiter: {q//60}m {q%60}s") 
+    # else:
+    #     print(f"No Jupiter: {q}s")
 
-    seed(123456789)
-    t0 = perf_counter()
-    solarCollapseJup(p-2, f"SolColJupL.bin", 200)
-    t1 = perf_counter()
-    q = t1 - t0
-    if q > 3600:
-        print(f"Jupiter: {q//3600}h {(q%3600)//60}m {q%60}s")
-    elif q > 60:
-        print(f"Jupiter: {q//60}m {q%60}s")
-    else:
-        print(f"Jupiter: {q}s")
+    # seed(123456789)
+    # t0 = perf_counter()
+    # solarCollapseJup(p-2, f"SolColJupL.bin", 10000)
+    # t1 = perf_counter()
+    # q = t1 - t0
+    # if q > 3600:
+    #     print(f"Jupiter: {q//3600}h {(q%3600)//60}m {q%60}s")
+    # elif q > 60:
+    #     print(f"Jupiter: {q//60}m {q%60}s")
+    # else:
+    #     print(f"Jupiter: {q}s")
     # rms radius and median radius -> half mass radius for glob
     # for j in range(5):
     #     t0 = perf_counter()
@@ -437,17 +437,18 @@ if __name__=="__main__":
     #     else:
     #         print(f"No Jupiter {j}: {q}s")
 
-    testEnv()
+    # testEnv()
     # DEFAULTFILE = "TEST.bin"
     # p=5
 
     # solarSystemTests()
 
-    # setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
-    #             timescale_=timescale, tracelength_=tracelength)
-    # animateFile(DEFAULTFILE, p=p, frameskip=frameskip, repeat=False, ax=(0,1))
+    setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
+                timescale_=timescale, tracelength_=2, 
+                shiftToFirstParticle_=False)
+    # # animateFile("SolColJupL10000.bin", p=102, frameskip=1000, repeat=False, ax=(0,1))
 
-    # graphEnergies(DEFAULTFILE, False, p=p)
-    # graphEnergies(DEFAULTFILE, True, p=p)
-    # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(1,2))
+    # graphEnergies("SolColNoJupL10000.bin", False, p=101, step=1)
+    # graphEnergies("SolColNoJupL10000.bin", True, p=101, step=1)
+    animateFile("SolColNoJupL10000.bin", p=101, frameskip=10000, repeat=False, ax=(0,1))
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))
