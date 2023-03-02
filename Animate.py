@@ -36,7 +36,7 @@ def setAnimate(widthheight_=None, scale_=None,
     if timescale_ is not None:
         timescale = timescale_
     if tracelength_ is not None:
-        tracelength = tracelength
+        tracelength = tracelength_
     if shiftToFirstParticle_ is not None:
         shiftToFirstParticle = shiftToFirstParticle_
 
@@ -114,10 +114,14 @@ def animateFile(filename, p=2, frameskip=1, ax=(0,1), save=False, **kws):
         ani.save(filename.split(".")[0] + ".gif")
     plt.show()
 
-def graphEnergies(filename, change=False, p=2):
+def graphEnergies(filename, change=False, p=2, step=1):
     fig, ax = plt.subplots()
     if filename.endswith(".bin"):
         times, kin, grav, total, masses, objs = getDataBinary(filename, p)
+        times = times[::step]
+        kin = kin[::step]
+        grav = grav[::step]
+        total = total[::step]
     else:
         raise ValueError("File extension must be .bin")
     t = times / timescale[0]
