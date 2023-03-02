@@ -55,7 +55,7 @@ def averageRagainstT():
     plt.ylabel("Average Orbital Distance, AU")
     plt.legend()
     plt.show()
-averageRagainstT()
+# averageRagainstT()
 
 
 def plotframe(i=0):
@@ -154,11 +154,11 @@ def numParticles(lst: tuple, i=0) -> list:
     # -> count non zero masses
     return np.count_nonzero(lst, axis=1) - i
 
-# numPartiJup = np.array([numParticles(J[4], 2) for J in withJupiter])
-# avgNumJup = np.average(numPartiJup, axis=0)
+numPartiJup = np.array([numParticles(J[4], 2) for J in withJupiter])
+avgNumJup = np.average(numPartiJup, axis=0)
 
-# numPartiNoJup = np.array([numParticles(NJ[4], 1) for NJ in withoutJupiter])
-# avgNumNoJup = np.average(numPartiNoJup, axis=0)
+numPartiNoJup = np.array([numParticles(NJ[4], 1) for NJ in withoutJupiter])
+avgNumNoJup = np.average(numPartiNoJup, axis=0)
 
 def RateOfMerging():
     fig, ax = plt.subplots()
@@ -208,5 +208,5 @@ def RateOfMerging():
     tNoJup2 = (-c - np.sqrt(c**2 + 8 * b * np.log(10)) / (2 * b)) ** 2
     print(f"tJup = {tJup1}, {tJup2};  tNoJup = {tNoJup1} , {tNoJup2}")
 
-# RateOfMerging()
+RateOfMerging()
 # plotframe(0)

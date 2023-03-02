@@ -448,7 +448,7 @@ if __name__=="__main__":
                 shiftToFirstParticle_=False)
     # # animateFile("SolColJupL10000.bin", p=102, frameskip=1000, repeat=False, ax=(0,1))
 
-    # graphEnergies("SolColNoJupL10000.bin", False, p=101, step=1)
-    # graphEnergies("SolColNoJupL10000.bin", True, p=101, step=1)
-    animateFile("SolColNoJupL10000.bin", p=101, frameskip=10000, repeat=False, ax=(0,1))
+    graphEnergies("SolColNoJupL10000.bin", False, p=101, step=1000)
+    graphEnergies("SolColNoJupL10000.bin", True, p=101, step=1000)
+    # animateFile("SolColNoJupL10000.bin", p=101, frameskip=10000, repeat=False, ax=(0,1))
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))
