@@ -51,6 +51,8 @@ else:
     frameskip = 1
 
 eps = smooth * scale[0]
+rho = 5000 # kg m^-3
+gamma = (3 / (4 * np.pi * rho)) / 4 / smooth # tweak to give same as eps
 
 def calcMasslessForce(pair):
     A, B = pair
@@ -83,7 +85,7 @@ class System:
         if none used the "DEFAULTFILE" value'''
         self.time = 0
         self.MaxTimeStep = MaxTimeStep
-        self.CurTimeStep = MaxTimeStep # currently unused.
+        self.updateMatrix = np.array([[1, self.MaxTimeStep, self.MaxTimeStep**2],[0, 1, self.MaxTimeStep],[0, 0, 0]])
         self.ParticleMasses = None
         self.Particles = None
         self.coupled = None
@@ -117,12 +119,14 @@ class System:
 
         Fs, dists = vCalcMasslessForce(pairs)
         coup = copy.deepcopy(self.coupled)
+       
+        epss = gamma * np.sum(self.ParticleMasses[pij] ** (1/3), axis=1)
 
         for n, (i, j) in enumerate(pij):
             if not coup[i] or not coup[j]:
                 print("NOT WORKING 1")
                 continue
-            if dists[n] < 2*eps:
+            if dists[n] < 2*epss[n]:
                 if self.ParticleMasses[i] >= self.ParticleMasses[j]:
                     self.Couple(i, j)
                 else:
@@ -142,10 +146,8 @@ class System:
     def Update(self) -> None:
         """Update the positions and velocities of the particles in the system based
         on the current time step"""  
-        updateMatrix = np.array([[1, self.CurTimeStep, self.CurTimeStep**2],[0, 1, self.CurTimeStep],[0, 0, 0]])
-        self.Particles = updateMatrix @ self.Particles
-        self.minDist = scale[0]
-        self.time += self.CurTimeStep
+        self.Particles = self.updateMatrix @ self.Particles
+        self.time += self.MaxTimeStep
 
     def Couple(self, i, j):
         """set the coupled condition on j and set the mass to 0
@@ -153,11 +155,16 @@ class System:
         # v_new = p1+p2 / (m1+m2)
         # conserves momentum but not energy
         print(f"t={self.time}; Coupled {i} {self.ParticleMasses[i] :.3} and {j} {self.ParticleMasses[j] :.3}, {np.count_nonzero(self.coupled)-1} particles left", flush=True)
- 
+        # print(f"Particle {i}: {self.Particles[i]}")
+        # print(f"Particle {j}: {self.Particles[j]}")
+    
+        # set acceleration to 0
         self.Particles[i][2] = [0, 0, 0]
+        # move to center of momentum
         self.Particles[i][1] = (self.ParticleMasses[i]*self.Particles[i][1] + self.ParticleMasses[j]*self.Particles[j][1]) / (self.ParticleMasses[i] + self.ParticleMasses[j])
-        # Centre of Mass
+        # move to Centre of Mass
         self.Particles[i][0] = (self.ParticleMasses[i] * self.Particles[i][0] + self.ParticleMasses[j] * self.Particles[j][0]) / (self.ParticleMasses[i] + self.ParticleMasses[j])
+        # combine masses
         self.ParticleMasses[i] += self.ParticleMasses[j]
         # move the other particle out and set the mass to 0, and the coupled condition
         self.Particles[j] = np.array([[10*scale[0], 10*scale[0], 10*scale[0]], [0, 0, 0], [0, 0, 0]])
@@ -166,17 +173,8 @@ class System:
         
     def doTimestep(self, tmin:float = None) -> None:
         """Call self.Interaction then self.Update, variable timestep length"""#
-        if tmin is None or np.count_nonzero(self.coupled) == 1 or tmin <= self.CurTimeStep:
-            self.Interaction()
-            self.Update()
-        else:
-            t = 0
-            while t < tmin:
-                self.Interaction()
-                if t + self.CurTimeStep > tmin:
-                    self.CurTimeStep = tmin - t
-                self.Update()
-                t += self.CurTimeStep
+        self.Interaction()
+        self.Update()
     def AddParticle(self, m:float, x:float, y:float, z:float, vx=0.0, vy=0.0, vz=0.0):
         """Add a particle with mass m at coordinates (x, y, z) with optional velocity (vx, vy, vz)"""
         # idk which one works
@@ -234,9 +232,8 @@ class System:
             F = (G / (dabs**2 + eps**2)**(3/2)) * d # bracket so one number is multiplied onto the array
             A[2] -= F * self.ParticleMasses[j] # masses multiplied here to avoid
             B[2] += F * self.ParticleMasses[i] # multiplying then dividing
-        # self.CurTimeStep = self.MaxTimeStep * (np.log(self.minDist/timestepB + 1) * logscale + .001)
         for p in self.Particles:
-            p[1] -= p[2] * self.CurTimeStep / 2
+            p[1] -= p[2] * self.MaxTimeStep / 2
 
 vel = lambda aph, sem: (G * M * (2/aph - 1/sem))**.5
 def genRandomPosVel():
@@ -294,27 +291,6 @@ def solarCollapseNoJup(n=100, File=DEFAULTFILE, numYears=50):
         a.doTimestep()
     print("100%", end=" ", flush=True)
     a.Record()
-    a.File.close()
-
-def globClust():
-    # globular cluster
-    a = System(0.2, file=DEFAULTFILE)
-    p = 100
-    for _ in range(p):
-        # sphere radius scale / 2
-        R = scale[0] * (1+0.2*random())
-        theta = random() * 2 * np.pi
-        phi = random() * np.pi
-        x = R * np.sin(theta) * np.cos(phi)
-        y = R * np.sin(theta) * np.sin(phi)
-        z = R * np.cos(theta)
-        a.AddParticle(0.01, x, y, z)
-    n=1000
-    for t in range(n):
-        if 100*(t+1)/n % 5 == 0:
-            print(100*(t+1)/n,"%", end=" ")
-        a.Record()
-        a.doTimestep(0.2)
     a.File.close()
 
 def solarSystemTests():
