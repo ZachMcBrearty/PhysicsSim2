@@ -27,7 +27,7 @@ if system_ == "Solar":
 
     solarscale = aph_ear # 1 A.U.
 
-    smooth = 0.001 # 10^-3
+    # smooth = 0.001 # 10^-3
 
     scale = (sem_ear, "A.U.")
     timescale = (365.25*24*60*60, "years")
@@ -42,7 +42,7 @@ else:
     globscale = 20 # r = scale/2 = 11
     scale = (globscale, "arb unit")
     timescale = (1, "s")
-    smooth = 0.05
+    # smooth = 0.05
 
     DEFAULTFILE = "GlobSim.bin"
     p=100
@@ -51,8 +51,11 @@ else:
     frameskip = 1
 rho = 5000 # kg m^-3
 
+smooth = 0.001 # 10^-3
 eps = smooth * scale[0]
-gamma = 4000 * (3 / (4 * np.pi * rho)) / 4 / smooth # 10**15 tweak to give same as eps
+rho = 5000 # kg m^-3#
+gamma = eps / (2*m_earth/100)**(1/3)
+# gamma = (3 / (4 * np.pi * rho))^(1/3) / 2 # tweak to give same as eps
 
 def calcMasslessForce(pair):
     A, B = pair
@@ -78,7 +81,7 @@ def vCalcMasslessForce(pairs):
     return Fs, dabss
 
 class System:
-    def __init__(self, MaxTimeStep=100, file=None):
+    def __init__(self, MaxTimeStep=100, file=None, coupleprint=True):
         '''Gravity Simulation system, add particles using .AddParticle,
         MaxTimeStep is the largest step in time taken in the simulation, variable based on distance
         file is the name or fileobject of the binary datafile to be used,
@@ -96,6 +99,7 @@ class System:
         elif isinstance(file, _TextIOWrapper):
             self.File = file
         self.minDist = scale[0]
+        self.coupleprint = coupleprint
 
     def upperTriIter(self, l):
         q = np.array(np.triu_indices(l, 1)).T.reshape(-1, 2)
@@ -154,7 +158,10 @@ class System:
         add the mass of j to i and add the velocities (conserving energy)"""
         # v_new = p1+p2 / (m1+m2)
         # conserves momentum but not energy
-        print(f"t={self.time}; Coupled {i} {self.ParticleMasses[i] :.3} and {j} {self.ParticleMasses[j] :.3}, {np.count_nonzero(self.coupled)-1} particles left", flush=True)
+        if self.coupleprint >= 2:
+            print(f"t={self.time}; Coupled {i} {self.ParticleMasses[i] :.3e} and {j} {self.ParticleMasses[j] :.3e}, {np.count_nonzero(self.coupled)-1} particles left", end="; ", flush=True)
+        elif self.coupleprint == 1:
+            print(np.count_nonzero(self.coupled)-1, "particles", end="; ", flush=True)
         # print(f"Particle {i}: {self.Particles[i]}")
         # print(f"Particle {j}: {self.Particles[j]}")
     
@@ -253,8 +260,8 @@ def genRandomPosVel():
     vz = 0
     return x, y, z, vx, vy, vz
 
-def solarCollapseJup(n=100, File=DEFAULTFILE, numYears=50):
-    a = System(10 * 24 * 60 * 60, file=File) # 2 days
+def solarCollapseJup(n=100, File=DEFAULTFILE, numYears=50, coupleprint=0):
+    a = System(10 * 24 * 60 * 60, file=File, coupleprint=coupleprint) # 2 days
     v_jup = vel(aph_jup, sem_jup)
     a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, -m_jup * v_jup / M, 0.0) # Sun
     a.AddParticle(m_jup, aph_jup, 0.0, 0.0, 0.0, +v_jup, 0.0) # Jupiter
@@ -277,8 +284,8 @@ def solarCollapseJup(n=100, File=DEFAULTFILE, numYears=50):
     a.Record()
     a.File.close()
 
-def solarCollapseNoJup(n=100, File=DEFAULTFILE, numYears=50):
-    a = System(10 * 24 * 60 * 60, file=File) # 10 days
+def solarCollapseNoJup(n=100, File=DEFAULTFILE, numYears=50, coupleprint=0):
+    a = System(10 * 24 * 60 * 60, file=File, coupleprint=coupleprint) # 10 days
     a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, 0, 0.0) # Sun
     for _ in range(n):
         x, y, z, vx, vy, vz = genRandomPosVel()
@@ -299,117 +306,46 @@ def solarCollapseNoJup(n=100, File=DEFAULTFILE, numYears=50):
     a.Record()
     a.File.close()
 
-def solarSystemTests():
-    m_other   = 0.33011 * 10**24 # mercury
-    sem_other = 57.91   * 10**9
-    # m_other   = 4.8675 * 10**24 # venus
-    # sem_other = 108.21 * 10**9
-    # m_other   = 0.64171 * 10**24 # mars
-    # sem_other = 227.92  * 10**9
-    # m_other   = 1898.19 * 10**24 # Jup
-    # sem_other = 778.57  * 10**9
-    # m_other   = 568.34  * 10**24 # Saturn
-    # sem_other = 1433.53 * 10**9
-    # m_other   = 86.813  * 10**24 # Uranus
-    # sem_other = 2872.46 * 10**9
-    # m_other   = 102.413 * 10**24 # Neptune
-    # sem_other = 4495.06 * 10**9
-    a = System(2 * 24 * 60 * 60, file="SOLARSYSTEST.bin") # 2 days
-    v_other = vel(sem_other, sem_other)
-    a.AddParticle(M, 0.0, 0.0, 0.0, 0.0, 0, 0.0) # Sun
-    a.AddParticle(m_other, sem_other, 0.0, 0.0, 0.0, +v_other, 0.0) # Other
-    v_earth = vel(sem_ear, sem_ear)
-    a.AddParticle(m_earth, -sem_ear, 0, 0, 0, -v_earth, 0) # Earth
-    a.Leapfrog()
-    a.Record()
-    a.Update()
-    dur = 100 * 365.25 / 2
-    for n in range(int(dur)):
-        a.Record()
-        a.doTimestep()
-        if n % 1000 == 0:
-            print(n, end=" ", flush=True)
-    a.Record()
-    a.File.close()
-    setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
-                timescale_=timescale, tracelength_=tracelength)
-    animateFile("SOLARSYSTEST.bin", p=3, frameskip=frameskip, repeat=False, ax=(0,1))
-    graphR("SOLARSYSTEST.bin")
-
 def randomP():
     x,y,z,vx,vy,vz = genRandomPosVel()
     return np.array([[x,y,z], [vx,vy,vz], [0.0,0.0,0.0]])
 
-def testEnv():
-    te = System(1*24*60*60, file="TEST.bin")
-
-    v = vel(aph_ear, aph_ear)
-    v2 = vel(aph_ear, 0.75*aph_ear)
-
-    te.AddParticle(M, 0,0,0, 0,-m_earth/2 * v / M + m_earth/2 * v2 / M,0)
-    
-    te.AddParticle(m_earth/2, aph_ear,0,0, 0,v,0)
-    te.AddParticle(m_earth/2, -aph_ear,0,0, 0,-v2,0)
-    # te.AddParticle(M, -20*eps,0,0, 0.002*eps,0,0)
-    # te.AddParticle(M, -5*eps,0,0, 0,0,0)
-    for x in range(365*15):
-        te.Record() 
-        te.doTimestep()
-        #te.doTimestep(0.01*60*60)
-    te.Record()
-    te.File.close()
-
-    p=3
-
-    setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
-                timescale_=timescale, tracelength_=5)
-    animateFile("TEST.bin", p=p, frameskip=10)
-    graphEnergies("TEST.bin", change=False, p=p)
-    graphEnergies("TEST.bin", change=True, p=p)
-
 if __name__=="__main__":
     from time import perf_counter
     from random import seed
-
-    for q in range(0, 7):
-        x = 4 - q
-        eps = 10**x * scale[0]
-        print(f"Run {x+4} with e = {eps:.5e}")
-        print("No Jup")
-        gamma = 4000 / 10**x # tweak to give same as eps
+    
+    durations = np.around(np.logspace(start=2, stop=4, num=9, base=10), -1)
+    for x in range(0, 9):
+        # -2 -2.125 -2.25 2.375 -2.5 -2.625 -2.75 -2.875 -3
+        smooth = 10**(-2 - x/8)
+        eps = smooth * scale[0]
+        gamma = eps / (2*m_earth/100)**(1/3)
+        print(f"x: {x}, smooth: {smooth:.3e}, eps: {eps:.3e}, gamma: {gamma:.3e}")
+        print(f"Running No Jup for {durations[x]} years")
         seed(123456789)
         t0 = perf_counter()
-        solarCollapseNoJup(p-2, f"SolColNoJupe{x}.bin", 10000)
+        solarCollapseNoJup(p-2, f"SolColNoJupe{-2 - x/8}.bin", durations[x], 1)
         t1 = perf_counter()
-
-        print("Jup")
+        q = t1 - t0
+        if q > 3600:
+            print(f"No Jupiter {x}: {q//3600}h {(q%3600)//60}m {q%60}s")
+        elif q > 60:
+            print(f"No Jupiter {x}: {q//60}m {q%60}s") 
+        else:
+            print(f"No Jupiter {x}: {q}s")
+        print(f"Running with Jup for {durations[x]} years")
         seed(123456789)
         t0 = perf_counter()
-        solarCollapseNoJup(p-2, f"SolColJupe{x}.bin", 10000)
+        solarCollapseJup(p-2, f"SolColJupe{-2 - x/8}.bin", durations[x], 1)
         t1 = perf_counter()
-    # seed(123456789)
-    # t0 = perf_counter()
-    # solarCollapseNoJup(p-2, f"SolColNoJupL10000.bin", 10000)
-    # t1 = perf_counter()
-    # q = t1 - t0
-    # if q > 3600:
-    #     print(f"No Jupiter: {q//3600}h {(q%3600)//60}m {q%60}s")
-    # elif q > 60:
-    #     print(f"No Jupiter: {q//60}m {q%60}s") 
-    # else:
-    #     print(f"No Jupiter: {q}s")
-
-    # seed(123456789)
-    # t0 = perf_counter()
-    # solarCollapseJup(p-2, f"SolColJupL.bin", 10000)
-    # t1 = perf_counter()
-    # q = t1 - t0
-    # if q > 3600:
-    #     print(f"Jupiter: {q//3600}h {(q%3600)//60}m {q%60}s")
-    # elif q > 60:
-    #     print(f"Jupiter: {q//60}m {q%60}s")
-    # else:
-    #     print(f"Jupiter: {q}s")
+        q = t1 - t0
+        if q > 3600:
+            print(f"Jupiter {x}: {q//3600}h {(q%3600)//60}m {q%60}s")
+        elif q > 60:
+            print(f"Jupiter {x}: {q//60}m {q%60}s")
+        else:
+            print(f"Jupiter {x}: {q}s")
+        print()
     # rms radius and median radius -> half mass radius for glob
     # for j in range(5):
     #     t0 = perf_counter()
