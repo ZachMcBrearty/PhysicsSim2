@@ -49,10 +49,10 @@ else:
     fs=1
     tracelength = 5
     frameskip = 1
+rho = 5000 # kg m^-3
 
 eps = smooth * scale[0]
-rho = 5000 # kg m^-3
-gamma = (3 / (4 * np.pi * rho)) / 4 / smooth # tweak to give same as eps
+gamma = 4000 * (3 / (4 * np.pi * rho)) / 4 / smooth # 10**15 tweak to give same as eps
 
 def calcMasslessForce(pair):
     A, B = pair
@@ -268,6 +268,9 @@ def solarCollapseJup(n=100, File=DEFAULTFILE, numYears=50):
     for t in range(n):
         if 100*(t)/n % 20 == 0:
             print(100*(t)/n,"%", end=" ",flush=True)
+        if np.count_nonzero(a.coupled) <= 7:
+            print("5 Particles left, ending early")
+            break
         a.Record()
         a.doTimestep()
     print("100%", end=" ", flush=True)
@@ -287,6 +290,9 @@ def solarCollapseNoJup(n=100, File=DEFAULTFILE, numYears=50):
     for t in range(n):
         if 100*(t)/n % 20 == 0:
             print(100*(t)/n,"%", end=" ",flush=True)
+        if np.count_nonzero(a.coupled) <= 6:
+            print("5 particles left, ending early")
+            break
         a.Record()
         a.doTimestep()
     print("100%", end=" ", flush=True)
@@ -365,6 +371,22 @@ if __name__=="__main__":
     from time import perf_counter
     from random import seed
 
+    for q in range(0, 7):
+        x = 4 - q
+        eps = 10**x * scale[0]
+        print(f"Run {x+4} with e = {eps:.5e}")
+        print("No Jup")
+        gamma = 4000 / 10**x # tweak to give same as eps
+        seed(123456789)
+        t0 = perf_counter()
+        solarCollapseNoJup(p-2, f"SolColNoJupe{x}.bin", 10000)
+        t1 = perf_counter()
+
+        print("Jup")
+        seed(123456789)
+        t0 = perf_counter()
+        solarCollapseNoJup(p-2, f"SolColJupe{x}.bin", 10000)
+        t1 = perf_counter()
     # seed(123456789)
     # t0 = perf_counter()
     # solarCollapseNoJup(p-2, f"SolColNoJupL10000.bin", 10000)
@@ -419,12 +441,12 @@ if __name__=="__main__":
 
     # solarSystemTests()
 
-    setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
-                timescale_=timescale, tracelength_=2, 
-                shiftToFirstParticle_=False)
-    # # animateFile("SolColJupL10000.bin", p=102, frameskip=1000, repeat=False, ax=(0,1))
+    # setAnimate(widthheight_=scale[0]*1.2, scale_=scale, 
+    #             timescale_=timescale, tracelength_=2, 
+    #             shiftToFirstParticle_=False)
+    # # # animateFile("SolColJupL10000.bin", p=102, frameskip=1000, repeat=False, ax=(0,1))
 
-    graphEnergies("SolColNoJupL10000.bin", False, p=101, step=1000)
-    graphEnergies("SolColNoJupL10000.bin", True, p=101, step=1000)
+    # graphEnergies("SolColNoJupL10000.bin", False, p=101, step=1000)
+    # graphEnergies("SolColNoJupL10000.bin", True, p=101, step=1000)
     # animateFile("SolColNoJupL10000.bin", p=101, frameskip=10000, repeat=False, ax=(0,1))
     # animateFile(DEFAULTFILE, p=p, frameskip=1, repeat=False, ax=(0,2))
